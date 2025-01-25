@@ -15,3 +15,6 @@ output/
 # 動画ファイル（サンプル以外）
 videos/*
 !videos/Sample.mp4
+
+# 設定ファイル（公開不可）
+config/config.yaml
