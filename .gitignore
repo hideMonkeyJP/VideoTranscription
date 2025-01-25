@@ -1,0 +1,17 @@
+# 仮想環境
+venv/
+.env
+
+# 出力ファイル
+output/
+
+# OS生成ファイル
+.DS_Store
+
+# IDE設定
+.vscode/
+.idea/
+
+# 動画ファイル（サンプル以外）
+videos/*
+!videos/Sample.mp4
