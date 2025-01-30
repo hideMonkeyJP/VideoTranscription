@@ -1,7 +1,10 @@
-moviepy==1.0.3
-openai-whisper==20231117
-ffmpeg-python==0.2.0
+numpy<2  # NumPy 2.x互換性問題のため1.x系に固定
+opencv-python==4.11.0.86
 pytesseract==0.3.10
-Pillow==10.2.0
-PyYAML==6.0.1
-python-dotenv==1.0.0
+scikit-learn==1.4.2
+moviepy==1.0.3
+Pillow==10.3.0
+transformers==4.40.0
+torch==2.0.1  # Python 3.9互換バージョンに変更
+openai-whisper==20231117  # 公式パッケージ名に修正
+python-dotenv==1.0.1
