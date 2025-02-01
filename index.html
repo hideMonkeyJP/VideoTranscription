@@ -1,0 +1,1605 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>動画文字起こしレポート</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #3498db;
+            --background-color: #f5f7fa;
+            --text-color: #2c3e50;
+            --border-radius: 8px;
+            --shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1, h2, h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+        
+        h1 {
+            font-size: 2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .toc {
+            background-color: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+        
+        .toc h2 {
+            margin-bottom: 1rem;
+        }
+        
+        .toc ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .toc li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .toc a {
+            color: var(--accent-color);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .toc a:hover {
+            color: var(--primary-color);
+        }
+        
+        .summary-section {
+            background-color: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+        
+        .metadata {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .metadata-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .metadata-label {
+            font-weight: bold;
+            color: var(--secondary-color);
+        }
+        
+        .segment {
+            background-color: white;
+            padding: 2rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 2rem;
+        }
+        
+        .segment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--background-color);
+        }
+        
+        .segment-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .segment-number {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+        
+        .timestamp {
+            background-color: var(--background-color);
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            font-family: monospace;
+        }
+        
+        .segment-content {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+        
+        .screenshots-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .screenshot {
+            position: relative;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+        
+        .screenshot img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .screenshot-time {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.9rem;
+            border-top-left-radius: var(--border-radius);
+        }
+        
+        @media (max-width: 768px) {
+            .screenshots-gallery {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+        }
+        
+        .text-content > div {
+            margin-bottom: 1.5rem;
+        }
+        
+        .text-content h3 {
+            font-size: 1.1rem;
+            color: var(--secondary-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .key-points ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .key-points li {
+            position: relative;
+            padding-left: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .key-points li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+        
+        .transcript {
+            background-color: var(--background-color);
+            padding: 1rem;
+            border-radius: var(--border-radius);
+        }
+        
+        .segment-footer {
+            margin-top: 1.5rem;
+            text-align: right;
+        }
+        
+        .back-to-top {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        
+        .back-to-top:hover {
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>動画文字起こしレポート</h1>
+        
+        <div class="toc">
+            <h2>目次</h2>
+            <ul>
+                <li><a href="#segment-1">00:00 - 00:03 、タスク管理ですね 文章: 文章: タスク管理ですねタスク管</a></li>
+<li><a href="#segment-2">00:03 - 00:08 文章: 文章: 文章: 文章: 文章: 文章:</a></li>
+<li><a href="#segment-3">00:08 - 00:12 、です。 文章: 文章: 文章:です。 文章: 文章: 文章</a></li>
+<li><a href="#segment-4">00:12 - 00:15 、文章: 文章: 文章: 文章: 文章:。 文章:です。 文</a></li>
+<li><a href="#segment-5">00:15 - 00:18 、文章:。 文章: 文章: 文章: 文章:。 文章:。 文章</a></li>
+<li><a href="#segment-6">00:18 - 00:19 、30文字以内の見出しでお願いします。文章: 文章: 文章:</a></li>
+<li><a href="#segment-7">00:19 - 00:23 がないからです。タスク管理が大事なのはタスク管理が大事だから</a></li>
+<li><a href="#segment-8">00:23 - 00:25 。 文章: 。 。 文章:。 笑 。 。 文章:。 笑笑 笑</a></li>
+<li><a href="#segment-9">00:25 - 00:28 。 文章: 文章: 文章: 文章:。 文章: タスク:</a></li>
+<li><a href="#segment-10">00:28 - 00:32 。あとは。あとは、。あとは、タツクの切り替えの時間っていうの</a></li>
+<li><a href="#segment-11">00:32 - 00:33 、簡潔に。よね。 見出し:ありますよね。 文章:ありますよね</a></li>
+<li><a href="#segment-12">00:33 - 00:37 、30文字以内の見出しでお願いします。 文章:。 文章:。 </a></li>
+<li><a href="#segment-13">00:37 - 00:39 です。 文章:ので、ので、。 文章:。 文章: 文章: 文章</a></li>
+<li><a href="#segment-14">00:39 - 00:40 し、簡潔にまとめてください。 文章: ようにしてください。 </a></li>
+<li><a href="#segment-15">00:40 - 00:43 の内容を30文字以内に収めてください。 文章:。 otion</a></li>
+<li><a href="#segment-16">00:43 - 00:46 を30文字以内に収めてください。 文章:。 文章:。 文章:</a></li>
+<li><a href="#segment-17">00:46 - 00:50 、30文字以内で見出し。 文章: 、 文章:やるとか、か。 </a></li>
+<li><a href="#segment-18">00:50 - 00:53 、見出し。見出し:。ちょっと待ってください。 文章:てくださ</a></li>
+            </ul>
+        </div>
+        
+        
+            <div class="summary-section">
+                <h2>動画の要約</h2>
+                <div class="metadata">
+                    <div class="metadata-item">
+                        <span class="metadata-label">処理日時:</span>
+                        <span class="metadata-value">2025-02-01T16:52:28.973816</span>
+                    </div>
+                    <div class="metadata-item">
+                        <span class="metadata-label">動画の長さ:</span>
+                        <span class="metadata-value">53.72秒</span>
+                    </div>
+                    <div class="metadata-item">
+                        <span class="metadata-label">セグメント数:</span>
+                        <span class="metadata-value">18</span>
+                    </div>
+                    <div class="metadata-item">
+                        <span class="metadata-label">スクリーンショット数:</span>
+                        <span class="metadata-value">54</span>
+                    </div>
+                </div>
+            </div>
+        
+        <div class="segments">
+            
+                    <div class="segment" id="segment-1">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#1</span>
+                                <h2>、タスク管理ですね 文章: 文章: タスク管理ですねタスク管</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:00</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:03</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>100文字以内の文章を100文字以内で要約してください。 文章: 文章:。 。 。。 文章: 文章: 文章: 文章: 文章:。 。 。100文字以内稼げない人稼げない100文字以内稼げない人 100文</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>、重要なポイントを3つ抽出してください。 文章:。。 文章: タスク管理ですね稼げる人と稼げない人とか。 文章:。 文章:ポイント。 文章:。 。人。げない人稼げない稼げる人稼げる稼げる稼げる稼げる稼げない人かかとか文章から重要な文章文章文章文章 人</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>まずタスク管理ですね稼げる人稼げない人とか</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-2">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#2</span>
+                                <h2>文章: 文章: 文章: 文章: 文章: 文章:</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:03</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:08</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>文章: タスク管理 文章: 100文字以内で100文字以内で要約してください。 100文字以内で100文字以内で100文字以内で要約してください。 文章:...</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>文章: タスク管理 文章: 文章: 文章:</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>できる人できない人の差で大きいのもタスク管理だと思いますね正直</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-3">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#3</span>
+                                <h2>、です。 文章: 文章: 文章:です。 文章: 文章: 文章</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:08</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:12</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>、100文字以内で要約してください。違いますね。 文章: 文章:</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>。 文章: 文章: 文章: 文章: 文章: 文章: 文章:...</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>いろんな人を見てますけどタスク管理ができてるかできてないかで</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-4">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#4</span>
+                                <h2>、文章: 文章: 文章: 文章: 文章:。 文章:です。 文</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:12</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:15</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>を100文字以内で要約してください。 文章:笑 文章:です。 文章:笑</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>、文章: 文章: 文章: 文章: 文章:。(笑) 文章:です。(笑) 文章:。(笑)</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>その人の実力結構わかるなっていう衝撃しています</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-5">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#5</span>
+                                <h2>、文章:。 文章: 文章: 文章: 文章:。 文章:。 文章</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:15</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:18</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>、。 文章: 文章: 文章: 文章: 文章: 文章: 文章:。 文章:。 文章:、。文章: 文章: 文章:。 文章:。100文字以内、、100文字以内100文字以内、、、100文字以内、避けてください</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>、文章: 文章: タスク管理ってやっぱ大事だなって思いますし、、。 文章:。 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章:</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>それぐらいタスク管理ってやっぱ大事だなって思いますし</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-6">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#6</span>
+                                <h2>、30文字以内の見出しでお願いします。文章: 文章: 文章:</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:18</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:19</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>。100文字以内の文章を100文字以内で要約してください。文章: 。。 文章: 。 文章:。。 文章: 。 文章:。。 文章:100文字以内100文字以内で要約してください。、100文字以内で要約して</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>文章から重要なポイントを抽出してください。文章: 重要な、、記述してください。文章: 。。 。 。 文章: 。ポイント抽出してください。、、、、、、文章をから、文章、文章:、 文章:文章: 文章: (笑)</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>僕もちゃんとやってますね</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-7">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#7</span>
+                                <h2>がないからです。タスク管理が大事なのはタスク管理が大事だから</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:19</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:23</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>がないからです。タスク管理が大事なのはタスク管理が大事だからです。文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章:からです。 からです。からないのです。からです。から っ</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>がないからです。タスク管理が大事なのはタスク管理が大事だからです。 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章:からです。 。。ないから。 文章: から。 文章: っていうとかか抽出、なくてでから文章って文章、</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>なんでタスク管理が大事かっていうとそもそもタスク考える時間が</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-8">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#8</span>
+                                <h2>。 文章: 。 。 文章:。 笑 。 。 文章:。 笑笑 笑</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:23</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:25</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>を100文字以内で要約してください。 文章: 。 。。 文章:。。 。 文章: 。 文章:100文字以内で100文字以内で要約してください。100文字以内100文字以内で要約してください。、100文字</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>文章: 。 。 文章: 。 。 文章: 文章: 。 文章:。 文章:。 。 文章: ところですね。 文章:。 文章:を抽出してください。 文章:、文章:文章から重要なポイントを抽出してください。、、文章から、文章、文章:、 文章: 文章:。 文章:ですね</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>もったいないよねっていうところですね</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-9">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#9</span>
+                                <h2>。 文章: 文章: 文章: 文章:。 文章: タスク:</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:25</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:28</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>、100文字以内でお願いします。 文章:。 文章: タスク:</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>。 文章: 重要なポイントを3つ抽出してください。 文章:。 文章:</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>そこのタスクを考える時間っていうのをまずなくしましょうと</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-10">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#10</span>
+                                <h2>。あとは。あとは、。あとは、タツクの切り替えの時間っていうの</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:28</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:32</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>。あとは、。あとは、。あとは、のもあるんですけどね。あとは、ありますよね。あとは、。あとは、文章を100文字以内で要約してください。文章:。かな。100文字以内。、100文字以内100文字以内分な文章</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>。あと、一番多いのは、。あと、あとはのもあるんですけど、それとありますよね。あとは。あとは文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: かかかを、、文章抽出のもあります。文章から文章。。。 文章:のもあります。あります</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>それに伴ってやっぱり多いのってタツクの切り替えの時間っていうのもあります</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-11">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#11</span>
+                                <h2>、簡潔に。よね。 見出し:ありますよね。 文章:ありますよね</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:32</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:33</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>、100文字以内で要約してください。 文章:よね。よね。 ...ですよね</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>、意外とありますよね。 文章:よね。 文章:よね。ありますよね。ありますよね。 文章:よね。。 文章:ありますよね。 文章:んですよね。んですよね。ありますよね</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>これ意外とあります</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-12">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#12</span>
+                                <h2>、30文字以内の見出しでお願いします。 文章:。 文章:。 </h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:33</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:37</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>、100文字以内で100文字以内で要約してください。 文章:。みたいな感じで 文章:100文字以内で100文字以内で要約してください。 文章:</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>、。 文章: 文章: 文章: 文章: 文章: 文章: 文章: 文章: 。みたいな。 文章:。 文章: 文章:</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>例えば今日はSNSを投稿したから次何しようかなみたいな</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-13">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#13</span>
+                                <h2>です。 文章:ので、ので、。 文章:。 文章: 文章: 文章</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:37</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:39</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>と思わないでください。 文章: 文章: 文章:ので、ので、ので、100文字以内で100文字以内で要約してください。100文字以内で100文字以内で要約してください。 文章:、。、、、</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>しいので、ので、。 文章:...ので、。、もったいない。 、ので、時間もったいない。 文章:</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>その時間がもったいない</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-14">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#14</span>
+                                <h2>し、簡潔にまとめてください。 文章: ようにしてください。 </h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:39</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:40</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>て、簡潔に要約してください。 文章: 。 文章: 。ください。 文章:します。 文章: 文章: 文章: 。 文章: 。します。 文章: 。100文字以内で要約してください。、</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>、記述してください。 文章: なのでそこをなくしてください。 文章: なのでそこをなくしてください。 文章: 。 。。 文章: 。。 。。 。、</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>なのでそこをなくす</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-15">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#15</span>
+                                <h2>の内容を30文字以内に収めてください。 文章:。 otion</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:40</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:43</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>100文字以内で要約してください。100文字以内で要約してください。 文章:ですね。 文章:。。 文章:。。 文章:。 文章:ですね。。 文章:100文字以内100文字以内で要約してください。、100</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>文章から重要なポイントを抽出してください。文章:。 文章: 。。 文章: んですけど。 文章: 。 文章:。 文章:。 文章:。 文章: ですね。 文章:を、、、、、、文章から、文章から重要なポイントを抽出してください。、 文章:、 文章: 文章: 文章:ですね</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>あとはNotionって管理しましょうっていうところですね</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-16">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#16</span>
+                                <h2>を30文字以内に収めてください。 文章:。 文章:。 文章:</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:43</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:46</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>、100文字以内で100文字以内で要約してください。。 。 文章:</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>、記述してください。 文章:。 。 文章:</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>イメージこんな感じですね</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-17">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#17</span>
+                                <h2>、30文字以内で見出し。 文章: 、 文章:やるとか、か。 </h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:46</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:50</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>、100文字以内で要約してください。 100文字以内で100文字以内で要約してください。 100文字以内で100文字以内で100文字以内で要約してください。とかとかとか100文字以内で100文字以内で</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>ポイントを3つ抽出してください。 文章: 。 文章: 。 。 文章: とかか。 文章: 。 文章:か。 か。 文章: ポイント抽出してください。 文章:。 文章:やるとかか。、、、か。文章」から、文章から、、文章:、 文章:やるとか、か、</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>今日明日空いて待ちいつかやるとか</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+                    <div class="segment" id="segment-18">
+                        <div class="segment-header">
+                            <div class="segment-title">
+                                <span class="segment-number">#18</span>
+                                <h2>、見出し。見出し:。ちょっと待ってください。 文章:てくださ</h2>
+                            </div>
+                            <div class="timestamp">
+                                <span class="time-start">00:50</span>
+                                <span class="time-separator">-</span>
+                                <span class="time-end">00:53</span>
+                            </div>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshots-gallery">
+                                
+                            <div class="screenshot">
+                                <img src="screenshot_0.jpg" 
+                                     alt="スクリーンショット 1"
+                                     loading="lazy">
+                                <div class="screenshot-time">0秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_1.jpg" 
+                                     alt="スクリーンショット 2"
+                                     loading="lazy">
+                                <div class="screenshot-time">1秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_2.jpg" 
+                                     alt="スクリーンショット 3"
+                                     loading="lazy">
+                                <div class="screenshot-time">2秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_3.jpg" 
+                                     alt="スクリーンショット 4"
+                                     loading="lazy">
+                                <div class="screenshot-time">3秒</div>
+                            </div>
+                            
+                            <div class="screenshot">
+                                <img src="screenshot_4.jpg" 
+                                     alt="スクリーンショット 5"
+                                     loading="lazy">
+                                <div class="screenshot-time">4秒</div>
+                            </div>
+                            
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>、100文字以内で100文字以内で要約してください。みたいな感じでお願いします。ください。ください</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        <li>、特に重要な、記述してください。各、記述してください。 文章:</li>
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>これちょっと後で配るんでちょっと待ってください</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="segment-footer">
+                            <a href="#" class="back-to-top">▲ トップへ戻る</a>
+                        </div>
+                    </div>
+                    
+        </div>
+    </div>
+</body>
+</html>
