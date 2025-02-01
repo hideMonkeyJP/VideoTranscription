@@ -1,6 +1,6 @@
 import os
 import argparse
-import datetime
+from datetime import datetime
 import json
 import re
 import itertools
@@ -13,63 +13,162 @@ import cv2
 import html
 import unicodedata
 from collections import Counter
-from transformers import pipeline
+from transformers import pipeline, T5Tokenizer, T5ForConditionalGeneration
+import sys
+import glob
+import traceback
 
 class VideoProcessor:
-    def __init__(self):
-        # デフォルトの設定
-        self.config = {
-            'speech_recognition': {
-                'whisper_model': 'medium',  # モデルサイズ
-                'language': 'ja',           # 日本語
-                'min_confidence': 0.5       # 最小信頼度
-            },
-            'ocr': {
-                'languages': 'jpn+eng'      # 日本語と英語のOCR
+    def __init__(self, output_dir='output'):
+        print("VideoProcessorの初期化を開始します...")
+        try:
+            self.output_dir = output_dir
+            os.makedirs(output_dir, exist_ok=True)
+            
+            print("T5モデルを読み込んでいます...")
+            self.tokenizer = T5Tokenizer.from_pretrained('sonoisa/t5-base-japanese')
+            self.model = T5ForConditionalGeneration.from_pretrained('sonoisa/t5-base-japanese')
+            self.model.eval()
+            print("T5モデルの読み込みが完了しました")
+            
+            # 音声認識の設定
+            self.config = {
+                'whisper_model': 'medium',
+                'language': 'ja',
+                'min_confidence': 0.5,
+                'languages': 'jpn+eng'
             }
-        }
-        
-        # 出力ディレクトリの設定
-        self.output_dir = 'output'
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+            
+            # Tesseractの設定
+            if sys.platform == 'darwin':  # macOS
+                pytesseract.pytesseract.tesseract_cmd = '/opt/homebrew/bin/tesseract'
+            elif sys.platform == 'win32':  # Windows
+                pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+            else:  # Linux
+                pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+            
+            # 音声認識の設定
+            self.recognizer = sr.Recognizer()
+            self.recognizer.energy_threshold = 4000
+            self.recognizer.dynamic_energy_threshold = True
+            
+            # モデルの読み込み
+            print("モデルを読み込んでいます...")
+            self.llm = pipeline(
+                "text2text-generation",
+                model="sonoisa/t5-base-japanese",
+                tokenizer="sonoisa/t5-base-japanese"
+            )
+            print("モデルの読み込みが完了しました")
+
+            print("初期化が完了しました")
+        except Exception as e:
+            print(f"初期化中にエラーが発生しました: {str(e)}")
+            print("詳細なエラー情報:")
+            print(traceback.format_exc())
+            raise
 
     def process_video(self, video_path):
-        """動画を処理してテキストと画像を抽出"""
+        """ビデオを処理し、文字起こし、要約、キーポイントを生成します"""
+        print("ビデオの処理を開始します...")
         try:
-            # 1. 音声の抽出
-            audio_path = self.extract_audio(video_path)
-            if not audio_path:
-                raise Exception("音声の抽出に失敗しました")
+            if not os.path.exists(video_path):
+                raise FileNotFoundError(f"ビデオファイルが見つかりません: {video_path}")
 
-            # 2. 音声の文字起こし
-            transcription = self.transcribe_audio(audio_path)
-            if not transcription:
-                raise Exception("音声認識に失敗しました")
-
-            # 3. スクリーンショットの生成と処理
+            # 音声認識を実行
+            segments = self.transcribe_audio(video_path)
+            if not segments:
+                print("警告: 音声認識結果が空です")
+                segments = []
+            
+            print(f"音声認識完了: {len(segments)}個のセグメントを検出")
+            
+            # スクリーンショットを取得
             screenshots = self.capture_screenshots(video_path)
             if not screenshots:
-                raise Exception("スクリーンショットの生成に失敗しました")
-
-            # 4. スクリーンショットのOCR処理
-            screenshots = self.process_screenshots(screenshots)
-
-            # 5. 結果の整形
+                print("警告: スクリーンショットの取得に失敗しました")
+                screenshots = []
+            
+            # 各セグメントを処理
+            processed_segments = []
+            total_segments = len(segments)
+            
+            for i, segment in enumerate(segments):
+                try:
+                    if segment.get('text'):  # テキストが存在する場合のみ処理
+                        processed_segment = self.process_segment(segment, i, total_segments)
+                        if processed_segment:
+                            processed_segments.append(processed_segment)
+                    else:
+                        print(f"警告: セグメント{i}のテキストが空です")
+                except Exception as e:
+                    print(f"セグメント{i}の処理中にエラー: {str(e)}")
+                    traceback.print_exc()
+                    continue
+            
+            # 最低1つのセグメントが必要
+            if not processed_segments:
+                print("警告: 処理されたセグメントがありません")
+                # 空のセグメントを作成
+                processed_segments.append({
+                    "start_time": 0,
+                    "end_time": 0,
+                    "text": "処理可能なテキストが見つかりませんでした。",
+                    "heading": "処理失敗",
+                    "summary": "処理可能なテキストが見つかりませんでした。",
+                    "key_points": ["処理可能なテキストが見つかりませんでした。"],
+                    "screenshot": ""
+                })
+            
+            # 結果を保存
             result = {
-                "video_file": os.path.basename(video_path),
-                "transcription": transcription,
-                "screenshots": screenshots
+                "metadata": {
+                    "processed_at": datetime.now().isoformat(),
+                    "video_duration": getattr(self, 'video_duration', 0),
+                    "segment_count": len(processed_segments),
+                    "screenshot_count": len(screenshots),
+                    "success": len(processed_segments) > 0
+                },
+                "segments": processed_segments
             }
-
-            # 6. 結果の保存
-            self.save_results(result)
-
+            
+            print("結果の保存を開始します...")
+            output_path = os.path.join(self.output_dir, "result.json")
+            os.makedirs(self.output_dir, exist_ok=True)
+            
+            try:
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    json.dump(result, f, ensure_ascii=False, indent=2)
+                print(f"結果をJSONファイルに保存しました: {output_path}")
+            except Exception as e:
+                print(f"結果の保存中にエラー: {str(e)}")
+                traceback.print_exc()
+            
+            # HTMLレポートを生成
+            try:
+                html_output_path = os.path.join(self.output_dir, "report.html")
+                if self.generate_html_report(result, html_output_path):
+                    print(f"HTMLレポートを生成しました: {html_output_path}")
+                else:
+                    print("警告: HTMLレポートの生成に失敗しました")
+            except Exception as e:
+                print(f"HTMLレポート生成中にエラー: {str(e)}")
+                traceback.print_exc()
+            
             return result
-
+            
         except Exception as e:
-            print(f"ビデオ処理中にエラー: {e}")
-            return None
+            print(f"ビデオ処理中にエラーが発生しました: {str(e)}")
+            traceback.print_exc()
+            # 最低限の結果を返す
+            return {
+                "metadata": {
+                    "processed_at": datetime.now().isoformat(),
+                    "error": str(e),
+                    "success": False
+                },
+                "segments": []
+            }
 
     def extract_audio(self, video_path):
         """動画から音声を抽出"""
@@ -87,12 +186,12 @@ class VideoProcessor:
         from whisper.utils import get_writer
         
         # Whisperモデルのロード
-        model = whisper.load_model(self.config['speech_recognition'].get('whisper_model', 'medium'))
+        model = whisper.load_model(self.config['whisper_model'])
         
         # 音声認識の実行
         result = model.transcribe(
             audio_path,
-            language=self.config['speech_recognition']['language'],
+            language=self.config['language'],
             temperature=0.2,                # 確定的な出力
             beam_size=3,                    # 精度と速度のバランス
             best_of=3,                      # 候補数最適化
@@ -134,7 +233,7 @@ class VideoProcessor:
             for word_idx, word in enumerate(segment.get('words', [])):
                 try:
                     confidence = word.get('probability', 0)
-                    if confidence >= self.config['speech_recognition'].get('min_confidence', 0.5):
+                    if confidence >= self.config['min_confidence']:
                         clean_text = re.sub(
                             r'[^\wぁ-んァ-ン一-龯ａ-ｚＡ-Ｚ０-９・ー、。]',
                             '',
@@ -268,7 +367,7 @@ class VideoProcessor:
                 # OCR実行（設定を最適化）
                 text = pytesseract.image_to_string(
                     image,
-                    lang=self.config['ocr']['languages'],
+                    lang=self.config['languages'],
                     config='--psm 6 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン、。，．・ー'
                 )
 
@@ -403,131 +502,211 @@ class VideoProcessor:
         return screenshots
 
     def analyze_content(self, transcription, screenshots):
-        """音声認識結果とスクリーンショットを組み合わせてコンテンツを分析"""
+        """文字起こしとスクリーンショットを分析してセグメントに分割"""
         segments = []
-        current_segment = []
+        current_segment = None
         current_screenshots = []
-        start_time = 0
-        segment_duration = 60  # 1分ごとにセグメント分割
 
-        sorted_transcription = sorted(transcription, key=lambda x: x['start'])
+        # スクリーンショットを時間でソート
+        sorted_screenshots = sorted(screenshots, key=lambda x: x['timestamp'])
 
-        for entry in sorted_transcription:
-            while screenshots and screenshots[0]["timestamp"] <= entry["end"]:
-                current_screenshots.append(screenshots.pop(0))
+        for i, trans in enumerate(transcription):
+            # 新しいセグメントの開始条件をチェック
+            start_new_segment = (
+                current_segment is None or  # 最初のセグメント
+                len(current_segment['text']) > 150 or  # テキストが一定の長さを超えた
+                trans['start'] - current_segment['end'] > 2  # 2秒以上の間隔
+            )
 
-            current_segment.append(entry)
-            
-            if (entry['end'] - start_time > segment_duration or
-                (len(current_segment) > 1 and
-                 self._topic_changed(current_segment[-2]['text'], entry['text']))):
-                
-                segment_text = ' '.join(item['text'] for item in current_segment)
-                
-                    segment_info = {
-                        'start': start_time,
-                        'end': entry['end'],
-                        'text': segment_text,
-                        'heading': self.generate_heading(segment_text),
-                        'summary': self.generate_summary(segment_text),
-                        'key_points': self.extract_key_points(segment_text),
-                        'screenshots': [{
-                            'path': ss['image_path'],
-                            'timestamp': ss['timestamp'],
-                            'text': ss.get('text', '')
-                        } for ss in current_screenshots]
-                    }
-                    segments.append(segment_info)
-                
-                start_time = entry['end']
-                current_segment = []
-                current_screenshots = []
+            if start_new_segment:
+                # 現在のセグメントを保存
+                if current_segment is not None:
+                    # スクリーンショットの割り当て
+                    current_segment['screenshots'] = current_screenshots
+                    segments.append(current_segment)
+                    current_screenshots = []
 
-        if current_segment:
-            segment_text = ' '.join(item['text'] for item in current_segment)
-                segments.append({
-                    'start': start_time,
-                    'end': current_segment[-1]['end'],
-                    'text': segment_text,
-                    'heading': self.generate_heading(segment_text),
-                    'summary': self.generate_summary(segment_text),
-                    'key_points': self.extract_key_points(segment_text),
-                    'screenshots': [{
-                        'path': ss['image_path'],
-                        'timestamp': ss['timestamp'],
-                        'text': ss.get('text', '')
-                } for ss in current_screenshots + screenshots]
-                })
+                # 新しいセグメントの作成
+                current_segment = {
+                    'start': trans['start'],
+                    'end': trans['end'],
+                    'text': trans['text'],
+                    'heading': '',
+                    'summary': '',
+                    'key_points': []
+                }
+
+                # 見出しの生成
+                try:
+                    current_segment['heading'] = self.llm(f"次の文章の内容を30文字以内の見出しにまとめてください：{trans['text']}", max_length=50)
+                    current_segment['heading'] = current_segment['heading'][:30]
+                except Exception as e:
+                    print(f"見出し生成エラー: {e}")
+                    current_segment['heading'] = trans['text'][:30] + "..."
+
+                # 要約の生成
+                try:
+                    current_segment['summary'] = self.llm(f"次の文章を100文字以内で要約してください：{trans['text']}", max_length=150)
+                    current_segment['summary'] = current_segment['summary'][:100]
+                except Exception as e:
+                    print(f"要約生成エラー: {e}")
+                    current_segment['summary'] = trans['text'][:100] + "..."
+
+                # キーポイントの抽出
+                try:
+                    current_segment['key_points'] = [point.strip() for point in self.llm(f"次の文章から重要なポイントを3つ抽出してください：{trans['text']}", max_length=200).split('\n') if point.strip()][:3]
+                except Exception as e:
+                    print(f"キーポイント抽出エラー: {e}")
+                    current_segment['key_points'] = [trans['text'][:40] + "..."]
+
+            else:
+                # セグメントの更新
+                current_segment['end'] = trans['end']
+                current_segment['text'] += f" {trans['text']}"
+
+            # スクリーンショットの割り当て
+            while sorted_screenshots and sorted_screenshots[0]['timestamp'] <= trans['end']:
+                current_screenshots.append(sorted_screenshots.pop(0))
+
+        # 最後のセグメントの保存
+        if current_segment is not None:
+            current_segment['screenshots'] = current_screenshots
+            segments.append(current_segment)
 
         return segments
 
-    def generate_heading(self, text):
-        """見出し生成の実装"""
+    def llm(self, prompt, max_length=100):
+        """LLMを使用してテキスト生成を行います"""
         try:
-            from transformers import T5Tokenizer, T5ForConditionalGeneration
-            tokenizer = T5Tokenizer.from_pretrained("sonoisa/t5-base-japanese")
-            model = T5ForConditionalGeneration.from_pretrained("sonoisa/t5-base-japanese")
+            # プロンプトのエンコード
+            inputs = self.tokenizer.encode(prompt, return_tensors='pt', max_length=512, truncation=True)
             
-            input_text = f"タイトル: {text[:500]}"
-            input_ids = tokenizer.encode(
-                input_text,
-                return_tensors="pt",
-                max_length=512,
-                truncation=True
-            )
-            
-            outputs = model.generate(
-                input_ids,
-                max_length=30,
-                min_length=10,
+            # テキスト生成
+            outputs = self.model.generate(
+                inputs,
+                max_length=max_length,
                 num_beams=4,
-                temperature=0.7,
+                length_penalty=2.0,
+                early_stopping=True,
                 no_repeat_ngram_size=2,
+                temperature=0.7,
                 top_k=50,
                 top_p=0.95,
-                early_stopping=True
+                do_sample=True,
+                pad_token_id=self.tokenizer.pad_token_id,
+                bos_token_id=self.tokenizer.bos_token_id,
+                eos_token_id=self.tokenizer.eos_token_id
             )
             
-            heading = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            heading = heading.replace("タイトル:", "").strip()
-            return heading
+            # 出力のデコード
+            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+            
+            # プロンプトの部分を削除
+            if "文章：" in response:
+                response = response.split("文章：")[0]
+            if "見出し：" in response:
+                response = response.split("見出し：")[-1]
+            if "要約：" in response:
+                response = response.split("要約：")[-1]
+            if "ポイント：" in response:
+                response = response.split("ポイント：")[-1]
+            
+            # 箇条書きの処理
+            if "・" in response:
+                points = []
+                for line in response.split('\n'):
+                    line = line.strip()
+                    if line.startswith('・'):
+                        points.append(line[1:].strip())
+                    elif line:
+                        points.append(line)
+                response = '\n'.join(points)
+            
+            return response.strip()
             
         except Exception as e:
-            print(f"見出し生成エラー: {str(e)}")
-            words = text[:100].split()
-            return ' '.join(words[:5]) + "..."
+            print(f"LLM処理中にエラーが発生しました: {str(e)}")
+            return ""
 
-    def generate_summary(self, text):
-        """要約生成の実装"""
+    def process_segment(self, segment, segment_index, total_segments):
+        """
+        セグメントを処理し、メタデータを生成します。
+        """
         try:
-            summarizer = pipeline("summarization",
-                                model="ku-nlp/bart-base-japanese",
-                                tokenizer="ku-nlp/bart-base-japanese")
+            print(f"セグメント {segment_index + 1}/{total_segments} を処理中...")
             
-            text_length = len(text)
-            if text_length < 100:
-                max_length = 30
-                min_length = 10
+            # セグメントのテキストを取得
+            text = segment.get('text', '')
+            if not text:
+                print("セグメントのテキストが空です")
+                # 空のテキストの場合でもメタデータを返す
+                return {
+                    "start_time": segment.get('start', 0),
+                    "end_time": segment.get('end', 0),
+                    "text": "テキストなし",
+                    "heading": "テキストなし",
+                    "summary": "テキストなし",
+                    "key_points": ["テキストが検出されませんでした"],
+                    "screenshot": f"screenshot_{segment_index * 10}.jpg"
+                }
+            
+            # 見出しを生成
+            heading_prompt = f"""この文章の内容を簡潔な見出し（30文字以内）にしてください。
+            装飾的な表現は避け、内容を端的に表現してください。
+            文章：「{text}」
+            見出し："""
+            heading = self.llm(heading_prompt, max_length=50)
+            
+            # 要約を生成
+            summary_prompt = f"""この文章を100文字程度で要約してください。
+            文章：「{text}」
+            要約："""
+            summary = self.llm(summary_prompt, max_length=150)
+            
+            # キーポイントを生成
+            key_points_prompt = f"""この文章から重要なポイントを3つ箇条書きで抽出してください。
+            文章：「{text}」
+            ポイント："""
+            key_points = self.llm(key_points_prompt, max_length=200)
+            
+            # キーポイントが文字列の場合はそのまま使用し、リストの場合は結合
+            if isinstance(key_points, list):
+                # リストの各要素が辞書型の場合は、テキスト部分を抽出
+                key_points = [point.get('text', str(point)) if isinstance(point, dict) else str(point) for point in key_points]
+                key_points_text = "\n".join(key_points)
             else:
-                max_length = min(100, text_length // 3)
-                min_length = max(30, text_length // 6)
+                key_points_text = str(key_points)
             
-            summary = summarizer(
-                text[:1000],
-                max_length=max_length,
-                min_length=min_length,
-                no_repeat_ngram_size=3,
-                num_beams=4,
-                temperature=0.7,
-                do_sample=True
-            )[0]['summary_text']
+            # スクリーンショットのファイル名を生成
+            screenshot_filename = f"screenshot_{segment_index * 10}.jpg"
             
-            return summary.strip()
+            # メタデータを生成
+            metadata = {
+                "start_time": segment.get('start', 0),
+                "end_time": segment.get('end', 0),
+                "text": text,
+                "heading": heading[:30],  # 30文字に制限
+                "summary": summary[:100],  # 100文字に制限
+                "key_points": key_points_text.split('\n')[:3],  # 3つのポイントに制限
+                "screenshot": screenshot_filename
+            }
+            
+            print(f"セグメント {segment_index + 1} の処理が完了しました")
+            return metadata
             
         except Exception as e:
-            print(f"要約生成エラー: {str(e)}")
-            sentences = text.split('。')[:2]
-            return '。'.join(sentences) + '。'
+            print(f"セグメント処理中にエラーが発生しました: {str(e)}")
+            traceback.print_exc()
+            # エラーが発生した場合でも最低限のメタデータを返す
+            return {
+                "start_time": segment.get('start', 0),
+                "end_time": segment.get('end', 0),
+                "text": "エラーが発生しました",
+                "heading": "エラー",
+                "summary": f"処理中にエラーが発生しました: {str(e)}",
+                "key_points": ["エラーが発生しました"],
+                "screenshot": f"screenshot_{segment_index * 10}.jpg"
+            }
 
     def _calculate_similarity(self, text1, text2):
         """2つのテキスト間の類似度を計算"""
@@ -544,295 +723,155 @@ class VideoProcessor:
         union = len(ngrams1 | ngrams2)
         return intersection / union if union > 0 else 0
 
-    def extract_key_points(self, text):
-        """キーポイント抽出の改善実装"""
+    def _topic_changed(self, prev_text, current_text):
+        """トピックが変更されたかどうかを判定"""
+        # 類似度が低い場合はトピックが変更されたと判断
+        similarity = self._calculate_similarity(prev_text, current_text)
+        return similarity < 0.3  # 類似度が30%未満の場合はトピック変更とみなす
+
+    def generate_html_report(self, result_data, output_path):
+        """HTMLレポートを生成します"""
+        print(f"HTMLレポート生成を開始します: {output_path}")
+        
         try:
-            from transformers import T5Tokenizer, T5ForConditionalGeneration
+            metadata = result_data.get("metadata", {})
+            segments = result_data.get("segments", [])
             
-            # テキストの前処理
-            cleaned_text = re.sub(r'[\(\)\[\]「」『』]', '', text)  # 括弧類を削除
-            cleaned_text = re.sub(r'[:：]', '', cleaned_text)  # コロンを削除
-            cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()  # 空白の正規化
+            print(f"結果データのメタデータ: {metadata}")
+            print(f"セグメント数: {len(segments)}")
             
-            if not cleaned_text:
-                return []
+            # セグメントのHTMLを生成
+            print("セグメントHTMLの生成を開始します")
+            segments_html = []
+            for i, segment in enumerate(segments, 1):
+                if segment:
+                    segment_html = f"""
+                    <div class="segment">
+                        <div class="segment-header">
+                            <h2>{html.escape(str(segment['heading']))}</h2>
+                            <span class="timestamp">{int(segment['start_time'])}秒 - {int(segment['end_time'])}秒</span>
+                        </div>
+                        <div class="segment-content">
+                            <div class="screenshot">
+                                <img src="{html.escape(str(segment['screenshot']))}" alt="スクリーンショット">
+                            </div>
+                            <div class="text-content">
+                                <div class="summary">
+                                    <h3>要約</h3>
+                                    <p>{html.escape(str(segment['summary']))}</p>
+                                </div>
+                                <div class="key-points">
+                                    <h3>キーポイント</h3>
+                                    <ul>
+                                        {"".join(f"<li>{html.escape(str(point))}</li>" for point in segment['key_points'])}
+                                    </ul>
+                                </div>
+                                <div class="transcript">
+                                    <h3>文字起こし</h3>
+                                    <p>{html.escape(str(segment['text']))}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>"""
+                    segments_html.append(segment_html)
+                print(f"セグメント {i} のHTML生成が完了しました")
             
-            tokenizer = T5Tokenizer.from_pretrained("sonoisa/t5-base-japanese")
-            model = T5ForConditionalGeneration.from_pretrained("sonoisa/t5-base-japanese")
+            # HTMLの全体構造
+            html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>動画文字起こしレポート</title>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }}
+        .container {{
+            max-width: 1200px;
+            margin: 0 auto;
+        }}
+        .segment {{
+            background-color: white;
+            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .segment-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }}
+        .segment-header h2 {{
+            margin: 0;
+            color: #333;
+        }}
+        .timestamp {{
+            color: #666;
+        }}
+        .segment-content {{
+            display: flex;
+            gap: 20px;
+        }}
+        .screenshot {{
+            flex: 0 0 300px;
+        }}
+        .screenshot img {{
+            width: 100%;
+            border-radius: 4px;
+        }}
+        .text-content {{
+            flex: 1;
+        }}
+        h3 {{
+            color: #444;
+            margin: 15px 0 10px;
+        }}
+        .summary p {{
+            color: #333;
+            line-height: 1.6;
+        }}
+        .key-points ul {{
+            margin: 0;
+            padding-left: 20px;
+        }}
+        .key-points li {{
+            color: #333;
+            margin-bottom: 5px;
+        }}
+        .transcript p {{
+            color: #666;
+            line-height: 1.6;
+            font-size: 0.9em;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>動画文字起こしレポート</h1>
+        {"".join(segments_html)}
+    </div>
+</body>
+</html>
+"""
             
-            input_text = f"以下の文章から重要なポイントを抽出してください: {cleaned_text[:500]}"
-            input_ids = tokenizer.encode(
-                input_text,
-                return_tensors="pt",
-                max_length=512,
-                truncation=True
-            )
+            # HTMLファイルに保存
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
             
-            outputs = model.generate(
-                input_ids,
-                max_length=150,
-                min_length=30,
-                num_beams=5,
-                temperature=0.6,  # より確実な生成のため温度を下げる
-                no_repeat_ngram_size=3,
-                top_k=30,
-                top_p=0.92,
-                early_stopping=True,
-                repetition_penalty=1.2  # 繰り返しを抑制
-            )
-            
-            key_points_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            
-            # キーポイントの詳細な後処理
-            key_points = []
-            seen_points = set()
-            
-            for point in key_points_text.split('。'):
-                # 基本的なクリーニング
-                point = point.strip()
-                point = re.sub(r'(重要|大事)(\s*な)?\s*(ポイント|点)\s*[:：]?', '', point)  # 接頭辞の除去
-                point = re.sub(r'[「」『』（）\(\)\[\]\{\}]', '', point)  # 括弧類の除去
-                point = re.sub(r'[:：。、]$', '', point)  # 末尾の区切り文字を除去
-                point = point.strip()
-                
-                # 意味のある内容かチェック
-                if not point or len(point) < 8:  # 最小長さを増加
-                    continue
-                
-                # 日本語文字を含むかチェック
-                if not re.search(r'[ぁ-んァ-ン一-龯]', point):
-                    continue
-                    
-                # 記号のみの行を除外
-                if re.match(r'^[\s\W]+$', point):
-                    continue
-                    
-                # 省略記号で終わる不完全な文を除外
-                if point.endswith(('...', '…', '→')):
-                    continue
-                    
-                # 重複や類似のチェック
-                is_duplicate = any(
-                    self._calculate_similarity(point, existing) > 0.6  # 類似度の閾値を調整
-                    for existing in seen_points
-                )
-                
-                if not is_duplicate:
-                    key_points.append(point)
-                    seen_points.add(point)
-            
-            return key_points if key_points else [cleaned_text[:100] + "..."]
+            print(f"HTMLレポートを生成しました: {output_path}")
+            return True
             
         except Exception as e:
-            print(f"キーポイント抽出エラー: {str(e)}")
-            return [text[:100] + "..."]
-
-    def generate_html_report(self, results):
-        """HTMLレポートを生成"""
-        try:
-            # CSS定義
-            css = '''
-                body {
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif;
-                    line-height: 1.6;
-                    margin: 0;
-                    padding: 0;
-                    background: #ffffff;
-                }
-                .container {
-                    max-width: 900px;
-                    margin: 0 auto;
-                    padding: 2rem;
-                }
-                h1 { font-size: 2.5em; font-weight: 700; margin-bottom: 1em; color: #333; }
-                h2 { font-size: 1.8em; font-weight: 600; margin: 1em 0 0.5em; color: #333; }
-                h3 { font-size: 1.2em; font-weight: 600; color: #333; }
-                .segment {
-                    margin-bottom: 2.5em;
-                    padding: 1.5em;
-                    border: 1px solid #e1e4e8;
-                    border-radius: 6px;
-                    background: #fff;
-                }
-                .segment-header {
-                    margin-bottom: 1em;
-                    padding-bottom: 0.5em;
-                    border-bottom: 1px solid #e1e4e8;
-                }
-                .segment-time { color: #666; font-size: 0.9em; }
-                .summary-section {
-                    background: #f6f8fa;
-                    padding: 1em;
-                    border-radius: 4px;
-                    margin: 1em 0;
-                }
-                .key-points {
-                    list-style-type: none;
-                    padding-left: 0;
-                }
-                .key-points li {
-                    position: relative;
-                    padding-left: 1.5em;
-                    margin-bottom: 0.5em;
-                }
-                .key-points li:before {
-                    content: "•";
-                    position: absolute;
-                    left: 0.5em;
-                    color: #0366d6;
-                }
-                .screenshot-container {
-                    margin: 1.5em 0;
-                    border: 1px solid #e1e4e8;
-                    border-radius: 4px;
-                    overflow: hidden;
-                }
-                .screenshot {
-                    max-width: 100%;
-                    display: block;
-                }
-                .timestamp {
-                    color: #666;
-                    font-size: 0.9em;
-                    margin: 0.5em 1em;
-                }
-                .ocr-text {
-                    font-family: "Noto Sans JP", "Noto Sans CJK JP", monospace;
-                    font-size: 0.95em;
-                    line-height: 1.8;
-                    background: #f6f8fa;
-                    color: #24292e;
-                    padding: 1em;
-                    margin: 1em;
-                    border-radius: 4px;
-                    white-space: pre-line;
-                    border-left: 3px solid #0366d6;
-                }
-                .metadata {
-                    margin-top: 3em;
-                    padding-top: 1em;
-                    border-top: 1px solid #e1e4e8;
-                    color: #666;
-                    font-size: 0.9em;
-                }
-            '''
-
-            # HTMLの構築
-            html_parts = [
-                "<!DOCTYPE html>",
-                '<html lang="ja">',
-                "<head>",
-                '<meta charset="UTF-8">',
-                '<meta http-equiv="Content-Type" content="text/html; charset=utf-8">',
-                '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
-                "<title>動画コンテンツ要約</title>",
-                f"<style>{css}</style>",
-                "</head>",
-                "<body>",
-                "<div class='container'>",
-                "<h1>📝 動画コンテンツ要約</h1>",
-                f"<p>ファイル名: {results.get('video_file', '不明')}</p>",
-                "<div class='content'>"
-            ]
-
-            # セグメントの処理
-            for segment in results.get("segments", []):
-                # 時間の文字列化
-                start_time = str(datetime.timedelta(seconds=int(segment["start"])))
-                end_time = str(datetime.timedelta(seconds=int(segment["end"])))
-
-                # セグメントの内容を追加
-                html_parts.extend([
-                    "<div class='segment'>",
-                    "<div class='segment-header'>",
-                    f"<div class='segment-time'>{start_time} - {end_time}</div>",
-                    f"<h2>{html.escape(segment['heading'])}</h2>",
-                    "</div>",
-                    "<div class='summary-section'>",
-                    "<h3>📝 要約</h3>",
-                    f"<p>{html.escape(segment['summary'])}</p>",
-                    "</div>",
-                    "<h3>🎯 キーポイント</h3>",
-                    "<ul class='key-points'>"
-                ])
-
-                # キーポイントの追加
-                for point in segment['key_points']:
-                    html_parts.append(f"<li>{html.escape(point)}</li>")
-
-                html_parts.append("</ul>")
-
-                # スクリーンショットとOCRテキストの処理
-                for ss in segment.get('screenshots', []):
-                    timestamp = str(datetime.timedelta(seconds=int(ss['timestamp'])))
-                    # スクリーンショットのパスを相対パスに変換
-                    relative_path = os.path.relpath(ss['path'], self.output_dir)
-                    html_parts.extend([
-                        "<div class='screenshot-container'>",
-                        f"<img src='{relative_path}' alt='Screenshot' class='screenshot'>",
-                        f"<div class='timestamp'>タイムスタンプ: {timestamp}</div>"
-                    ])
-
-                    # OCRテキストの処理（文字化け対策強化版）
-                    ocr_text = ss.get('text', '').strip()
-                    if ocr_text:
-                        try:
-                            # 文字コードの正規化
-                            ocr_text = unicodedata.normalize('NFKC', ocr_text)
-                            # 制御文字の除去と空白の正規化
-                            ocr_text = ''.join(char for char in ocr_text if ord(char) >= 32 or char == '\n')
-                            ocr_text = re.sub(r'\s+', ' ', ocr_text)
-                            # HTMLエスケープと改行処理
-                            ocr_text = html.escape(ocr_text).replace('\n', '<br>')
-                            
-                            if ocr_text.strip():
-                                html_parts.append(
-                                    '<div class="ocr-text">'
-                                    '<span style="color: #666;">📄 検出されたテキスト:</span><br>'
-                                    f'{ocr_text}'
-                                    '</div>'
-                                )
-                        except Exception as e:
-                            print(f"OCRテキスト処理エラー: {str(e)}")
-
-                    html_parts.append("</div>")  # screenshot-container終了
-
-                html_parts.append("</div>")  # segment終了
-
-            # メタデータの追加
-            metadata = results.get("metadata", {})
-            duration = str(datetime.timedelta(seconds=int(metadata.get("video_duration", 0))))
-            html_parts.extend([
-                "<div class='metadata'>",
-                f"<p>処理日時: {metadata.get('processed_at', '不明')}</p>",
-                f"<p>動画時間: {duration}</p>",
-                f"<p>セグメント数: {metadata.get('segment_count', 0)}</p>",
-                "</div>",
-                "</div>",  # content終了
-                "</div>",  # container終了
-                "</body>",
-                "</html>"
-            ])
-
-            # HTMLファイルの保存（self.output_dirを使用）
-            os.makedirs(self.output_dir, exist_ok=True)
-            html_path = os.path.join(self.output_dir, "report.html")
-            
-            # HTMLファイルをBOM付きUTF-8で保存
-            with open(html_path, "wb") as f:
-                content = "\n".join(html_parts)
-                # BOMを追加してUTF-8でエンコード
-                f.write(b'\xef\xbb\xbf')
-                f.write(content.encode('utf-8', errors='replace'))
-
-            print(f"HTMLレポートを生成しました: {html_path}")
-            return html_path
-
-        except Exception as e:
-            import traceback
-            print(f"HTMLレポート生成中にエラー: {e}")
-            print(f"エラーの詳細:\n{traceback.format_exc()}")
-            return None
+            print(f"HTMLレポート生成中にエラーが発生しました: {str(e)}")
+            traceback.print_exc()
+            return False
 
     def save_results(self, result):
         """結果をファイルに保存"""
@@ -840,8 +879,16 @@ class VideoProcessor:
             # 出力ディレクトリの作成
             os.makedirs(self.output_dir, exist_ok=True)
             
+            # メタデータの追加
+            result['metadata'] = {
+                'processed_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'video_duration': sum([segment['end'] - segment['start'] for segment in result.get('segments', [])]),
+                'segment_count': len(result.get('segments', [])),
+                'screenshot_count': len(result.get('screenshots', []))
+            }
+            
             # 結果をJSONファイルとして保存
-            output_json = os.path.join(self.output_dir, 'transcription_result.json')
+            output_json = os.path.join(self.output_dir, 'result.json')
             with open(output_json, 'w', encoding='utf-8') as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
             
@@ -850,112 +897,49 @@ class VideoProcessor:
             
             print(f"結果を保存しました:")
             print(f"- JSON: {output_json}")
+            if html_path:
                 print(f"- HTML: {html_path}")
             
         except Exception as e:
-            import traceback
             print(f"結果の保存中にエラー: {e}")
             print(f"エラーの詳細:\n{traceback.format_exc()}")
 
-    def _generate_html_report(self, result):
-        """HTMLレポートを生成"""
-        html_template = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <title>動画書き起こしレポート</title>
-            <style>
-                body {
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-                    margin: 20px;
-                    line-height: 1.6;
-                }
-                .section {
-                    margin-bottom: 30px;
-                    padding: 20px;
-                    background: #f8f9fa;
-                    border-radius: 8px;
-                }
-                .timestamp {
-                    color: #666;
-                    font-size: 0.9em;
-                }
-                .screenshot {
-                    max-width: 100%;
-                    height: auto;
-                    margin: 10px 0;
-                    border-radius: 4px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                }
-                .transcription {
-                    margin: 10px 0;
-                    padding: 10px;
-                    background: white;
-                    border-radius: 4px;
-                }
-                .screenshot-section {
-                    margin-bottom: 20px;
-                    padding: 15px;
-                    background: white;
-                    border-radius: 4px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                }
-                h1, h2, h3 {
-                    color: #333;
-                }
-                .text {
-                    margin: 10px 0;
-                    line-height: 1.6;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>動画書き起こしレポート</h1>
-            <h2>ファイル: {video_file}</h2>
-            
-            <div class="section">
-                <h3>スクリーンショット</h3>
-                {screenshots_html}
-            </div>
-            
-            <div class="section">
-                <h3>書き起こし</h3>
-                {transcription_html}
-            </div>
-        </body>
-        </html>
-        """
-        
-        # スクリーンショットのHTML生成
-        screenshots_html = ""
-        for ss in result.get('screenshots', []):
-            screenshots_html += f"""
-            <div class="screenshot-section">
-                <p class="timestamp">時間: {ss['timestamp']}秒</p>
-                <img class="screenshot" src="{os.path.basename(ss['image_path'])}" alt="Screenshot">
-                <p class="text">{html.escape(ss.get('text', ''))}</p>
-            </div>
+    def _is_topic_change(self, prev_text, current_text):
+        """2つのテキスト間でトピックが変更されたかどうかを判定"""
+        try:
+            # 前後のテキストをLLMに渡して、トピックの変更があったかどうかを判定
+            prompt = f"""
+            以下の2つのテキストを比較して、トピックが変更されたかどうかを判定してください。
+            「はい」または「いいえ」で答えてください。
+
+            テキスト1: {prev_text}
+            テキスト2: {current_text}
             """
-        
-        # 書き起こしのHTML生成
-        transcription_html = ""
-        for entry in result.get('transcription', []):
-            transcription_html += f"""
-            <div class="transcription">
-                <span class="timestamp">[{entry['start']}s - {entry['end']}s]</span>
-                <span class="text">{html.escape(entry['text'])}</span>
-            </div>
-            """
-        
-        # テンプレートに値を挿入
-        html_content = html_template.format(
-            video_file=html.escape(result.get('video_file', '不明')),
-            screenshots_html=screenshots_html,
-            transcription_html=transcription_html
-        )
-        
-        return html_content
+            
+            response = self.llm(prompt, max_length=5, temperature=0.3)[0]['generated_text'].strip().lower()
+            return 'はい' in response or 'yes' in response
+        except Exception as e:
+            print(f"トピック変更判定エラー: {e}")
+            return False  # エラーの場合は変更なしとみなす
+
+    def extract_frames(self, video_path):
+        """ビデオからフレームを抽出します"""
+        try:
+            cap = cv2.VideoCapture(video_path)
+            frames = []
+            
+            while cap.isOpened():
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                frames.append(frame)
+            
+            cap.release()
+            return frames
+            
+        except Exception as e:
+            print(f"フレーム抽出中にエラーが発生しました: {str(e)}")
+            return []
 
 if __name__ == "__main__":
     import sys
