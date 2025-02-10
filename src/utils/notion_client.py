@@ -15,30 +15,35 @@ class NotionClient:
             "Content-Type": "application/json",
             "Notion-Version": "2022-06-28"
         }
+        # データベースのプロパティを取得
+        self.properties = self.get_database_properties()
+
+    def get_database_properties(self) -> Dict[str, Any]:
+        """データベースのプロパティ情報を取得"""
+        url = f"{self.base_url}/databases/{self.database_id}"
+        response = requests.get(url, headers=self.headers)
+        if response.status_code == 200:
+            database = response.json()
+            return database.get("properties", {})
+        else:
+            print(f"Error getting database: {response.json()}")
+            return {}
 
     def create_page(self, properties: Dict[str, Any]) -> Dict[str, Any]:
         """データベースに新しいページを作成"""
         url = f"{self.base_url}/pages"
         
-        # ページ作成用のペイロードを構築
-        # 必要なプロパティのみを含むペイロードを作成
-        filtered_properties = {
-            k: v for k, v in properties.items()
-            if k in ["Title", "Summary", "Keywords ", "Duration ", "ProcessedDate ", "Thumbnail "]
-        }
-        
         payload = {
             "parent": {
                 "database_id": self.database_id
             },
-            "properties": filtered_properties
+            "properties": properties
         }
         
         response = requests.post(url, headers=self.headers, json=payload)
         response_json = response.json()
         
-        if response.status_code == 200:
-            # 必要なフィールドのみを抽出
+        if response.status_code in [200, 201]:  # 200と201の両方を正常なレスポンスとして扱う
             return {
                 "id": response_json.get("id"),
                 "url": response_json.get("url"),
@@ -52,131 +57,63 @@ class NotionClient:
                 response=response
             )
 
-    def update_page(self, page_id: str, properties: Dict[str, Any]) -> Dict[str, Any]:
-        """既存のページを更新"""
-        url = f"{self.base_url}/pages/{page_id}"
-        
-        payload = {
-            "properties": properties
-        }
-        
-        response = requests.patch(url, headers=self.headers, json=payload)
-        response.raise_for_status()
-        return response.json()
-
-    def create_video_entry(self, video_data: Dict[str, Any]) -> Dict[str, Any]:
-        """動画データをNotionデータベースに登録"""
-        properties = {
-            "Title": {
-                "title": [
-                    {
-                        "type": "text",
-                        "text": {
-                            "content": video_data.get("title", "Untitled Video")
-                        }
-                    }
-                ]
-            },
-            "Summary": {
-                "rich_text": [
-                    {
-                        "type": "text",
-                        "text": {
-                            "content": video_data.get("summary", "")[:2000]
-                        }
-                    }
-                ]
-            },
-            "Keywords ": {
-                "multi_select": [
-                    {"name": keyword} for keyword in video_data.get("keywords", [])[:10]
-                ]
-            },
-            "Duration ": {
-                "number": float(video_data.get("duration", 0))
-            },
-            "ProcessedDate ": {
-                "date": {
-                    "start": datetime.now().isoformat()
-                }
-            }
-        }
-
-        # サムネイル画像のURLがある場合
-        if "thumbnail_url" in video_data:
-            properties["Thumbnail "] = {
-                "files": [
-                    {
-                        "type": "external",
-                        "name": "thumbnail.jpg",
-                        "external": {
-                            "url": video_data["thumbnail_url"]
-                        }
-                    }
-                ]
-            }
-
-        try:
-            return self.create_page(properties)
-        except Exception as e:
-            print(f"Error creating video entry: {str(e)}")
-            raise
-
     def format_video_data(self, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
-        """分析結果をNotionに適した形式に変換"""
-        # 基本情報の取得
+        """分析結果をNotion用にフォーマット"""
         metadata = analysis_result.get("metadata", {})
-        title = metadata.get("title", "Untitled Video")
-        duration = float(metadata.get("duration", 0))  # 数値型に変換
-
-        # 要約の取得
-        summary = ""
-        if isinstance(analysis_result.get("summary"), dict):
-            # 新しい形式: summaryオブジェクトから直接取得
-            summary_points = analysis_result["summary"].get("key_scenes", [])
-            summary = "\n".join(f"• {scene['summary']}" for scene in summary_points[:5])
-        elif "scene_analyses" in analysis_result:
-            # 従来の形式: scene_analysesから取得
-            summaries = []
-            for scene in analysis_result["scene_analyses"]:
-                if scene.get("summary", {}).get("main_points"):
-                    summaries.extend(scene["summary"]["main_points"])
-            summary = "\n".join(f"• {point}" for point in summaries[:5])
-
-        # キーワードの取得
-        keywords = []
-        if isinstance(analysis_result.get("summary"), dict):
-            # 新しい形式: summaryオブジェクトから直接取得
-            keywords = analysis_result["summary"].get("keywords", [])
-        elif "scene_analyses" in analysis_result:
-            # 従来の形式: scene_analysesから集約
-            keyword_set = set()
-            for scene in analysis_result["scene_analyses"]:
-                keyword_set.update(scene.get("keywords", []))
-            keywords = list(keyword_set)
-
-        # durationが0の場合は最後のシーンのタイムスタンプを使用
-        if duration == 0 and "scene_analyses" in analysis_result and analysis_result["scene_analyses"]:
-            last_scene = analysis_result["scene_analyses"][-1]
-            duration = float(last_scene.get("timestamp", 0))
-
-        # テスト用のデータ形式に対応
-        if isinstance(analysis_result, dict) and "duration" in analysis_result:
-            duration = float(analysis_result["duration"])
-
+        contexts = analysis_result.get("contexts", [])
+        
+        # 文脈ごとの要約を構築
+        context_summaries = []
+        for i, context in enumerate(contexts, 1):
+            time_range = context.get('time_range', {})
+            start_time = time_range.get('start', 0)
+            end_time = time_range.get('end', 0)
+            
+            # 重要シーンを選択
+            scenes = context.get('scenes', [])
+            important_scenes = sorted(
+                scenes,
+                key=lambda x: x.get('importance_score', 0),
+                reverse=True
+            )[:5]
+            
+            # 要約を生成
+            summary_lines = [
+                f"### {start_time:.1f}秒 - {end_time:.1f}秒",
+                f"要約: {context.get('summary', '')}",
+                "重要シーン:"
+            ]
+            
+            for scene in important_scenes[:2]:
+                summary_lines.append(
+                    f"- {scene.get('timestamp', 0):.1f}秒: {scene.get('summary', {}).get('main_points', [''])[0]}"
+                )
+            
+            context_summaries.append("\n".join(summary_lines))
+        
+        # キーワードの収集と重要度によるソート
+        keyword_scores = {}
+        for context in contexts:
+            for scene in context.get('scenes', []):
+                for keyword in scene.get('keywords', []):
+                    keyword_scores[keyword] = keyword_scores.get(keyword, 0) + scene.get('importance_score', 0)
+        
+        sorted_keywords = sorted(
+            keyword_scores.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )[:10]
+        
         return {
-            "title": title,
-            "summary": summary,
-            "keywords": keywords[:10],  # 最大10個のキーワード
-            "duration": duration,
-            "thumbnail_url": metadata.get("thumbnail_url", "")
+            "title": f"動画分析レポート {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            "summary": "\n\n".join(context_summaries),
+            "keywords": [kw for kw, _ in sorted_keywords],
+            "duration": metadata.get("total_duration", 0),
+            "processed_at": datetime.now().isoformat()
         }
 
-    def sync_analysis_results(self, analysis_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """複数の分析結果をNotionと同期"""
-        synced_results = []
-        for result in analysis_results:
-            formatted_data = self.format_video_data(result)
-            notion_entry = self.create_video_entry(formatted_data)
-            synced_results.append(notion_entry)
-        return synced_results
+    def print_database_schema(self):
+        """データベースのスキーマ情報を表示"""
+        print("\n=== Notionデータベースのプロパティ ===")
+        for name, prop in self.properties.items():
+            print(f"{name}: {prop.get('type')}")

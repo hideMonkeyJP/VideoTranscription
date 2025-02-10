@@ -1,119 +1,161 @@
+"""
+ロギング設定とユーティリティ
+"""
+
 import logging
-import logging.handlers
 import os
-import yaml
 from datetime import datetime
-from typing import Optional, Dict, Any
+from logging.handlers import RotatingFileHandler
+from typing import Optional
+
+class CustomLogger:
+    """カスタムロガークラス"""
+    
+    _instances = {}
+    
+    def __new__(cls, name: str, *args, **kwargs):
+        if name not in cls._instances:
+            instance = super().__new__(cls)
+            cls._instances[name] = instance
+            return instance
+        return cls._instances[name]
+    
+    def __init__(
+        self,
+        name: str,
+        log_dir: str = "logs",
+        log_level: int = logging.INFO,
+        max_bytes: int = 10 * 1024 * 1024,  # 10MB
+        backup_count: int = 5
+    ):
+        if hasattr(self, 'logger'):
+            return
+            
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(log_level)
+        
+        # 既存のハンドラをクリア
+        self.logger.handlers = []
+        
+        # ログディレクトリの作成
+        os.makedirs(log_dir, exist_ok=True)
+        
+        # ファイル名の設定
+        log_file = os.path.join(log_dir, f"{name}.log")
+        
+        # ファイルハンドラの設定
+        file_handler = RotatingFileHandler(
+            log_file,
+            maxBytes=max_bytes,
+            backupCount=backup_count,
+            encoding='utf-8'
+        )
+        file_handler.setLevel(log_level)
+        
+        # コンソールハンドラの設定
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(log_level)
+        
+        # フォーマッタの設定
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        file_handler.setFormatter(formatter)
+        console_handler.setFormatter(formatter)
+        
+        # ハンドラの追加
+        self.logger.addHandler(file_handler)
+        self.logger.addHandler(console_handler)
+    
+    def info(self, message: str) -> None:
+        """
+        INFO レベルのログを記録
+        
+        Args:
+            message: ログメッセージ
+        """
+        self.logger.info(message)
+    
+    def error(self, message: str, exc_info: Optional[Exception] = None) -> None:
+        """
+        ERROR レベルのログを記録
+        
+        Args:
+            message: ログメッセージ
+            exc_info: 例外情報
+        """
+        self.logger.error(message, exc_info=exc_info)
+    
+    def warning(self, message: str) -> None:
+        """
+        WARNING レベルのログを記録
+        
+        Args:
+            message: ログメッセージ
+        """
+        self.logger.warning(message)
+    
+    def debug(self, message: str) -> None:
+        """
+        DEBUG レベルのログを記録
+        
+        Args:
+            message: ログメッセージ
+        """
+        self.logger.debug(message)
+    
+    def critical(self, message: str, exc_info: Optional[Exception] = None) -> None:
+        """
+        CRITICAL レベルのログを記録
+        
+        Args:
+            message: ログメッセージ
+            exc_info: 例外情報
+        """
+        self.logger.critical(message, exc_info=exc_info)
+
+def get_logger(
+    name: str,
+    log_dir: str = "logs",
+    log_level: int = logging.INFO
+) -> CustomLogger:
+    """
+    ロガーインスタンスを取得
+    
+    Args:
+        name: ロガー名
+        log_dir: ログディレクトリ
+        log_level: ログレベル
+    
+    Returns:
+        CustomLogger: カスタムロガーインスタンス
+    """
+    return CustomLogger(name, log_dir, log_level)
 
 class VideoProcessorLogger:
-    def __init__(self, config_path: str = None):
-        self.logger = logging.getLogger('VideoProcessor')
-        if config_path is None:
-            # プロジェクトのルートディレクトリを取得
-            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            config_path = os.path.join(root_dir, 'config', 'config.yaml')
-        self.setup_logger(config_path)
-
-    def setup_logger(self, config_path: str) -> None:
-        """ロガーの設定を行います"""
-        try:
-            with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
-            
-            log_config = config.get('logging', {})
-            log_level = getattr(logging, log_config.get('level', 'INFO'))
-            max_files = log_config.get('max_files', 7)
-            
-            # ログディレクトリの作成
-            log_dir = 'logs'
-            os.makedirs(log_dir, exist_ok=True)
-            
-            # ログフォーマットの設定
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
-            
-            # ファイルハンドラの設定
-            log_file = os.path.join(log_dir, 'video_processor.log')
-            file_handler = logging.handlers.RotatingFileHandler(
-                log_file,
-                maxBytes=10*1024*1024,  # 10MB
-                backupCount=max_files,
-                encoding='utf-8'
-            )
-            file_handler.setFormatter(formatter)
-            
-            # コンソールハンドラの設定
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(formatter)
-            
-            # ロガーの設定
-            self.logger.setLevel(log_level)
-            self.logger.addHandler(file_handler)
-            self.logger.addHandler(console_handler)
-            
-        except Exception as e:
-            print(f"ロガーの設定中にエラーが発生しました: {str(e)}")
-            raise
-
-    def log_process_start(self, video_path: str) -> None:
-        """動画処理開始時のログを記録"""
-        self.logger.info(f"動画処理を開始します: {video_path}")
-
-    def log_process_complete(self, video_path: str, stats: Dict[str, Any]) -> None:
-        """動画処理完了時のログを記録"""
-        self.logger.info(
-            f"動画処理が完了しました: {video_path}\n"
-            f"統計情報:\n"
-            f"- 処理時間: {stats.get('processing_time', 'N/A')}秒\n"
-            f"- 抽出フレーム数: {stats.get('frame_count', 0)}\n"
-            f"- 音声セグメント数: {stats.get('segment_count', 0)}"
-        )
-
-    def log_error(self, error: Exception, context: Optional[Dict[str, Any]] = None) -> None:
-        """エラー情報をログに記録"""
-        error_msg = f"エラーが発生しました: {str(error)}"
+    """VideoProcessor専用のロガークラス"""
+    
+    def __init__(self, config_path=None):
+        """
+        Args:
+            config_path: 設定ファイルのパス
+        """
+        self.logger = get_logger("video_processor")
+        self.config_path = config_path
+    
+    def log_error(self, error: Exception, context: dict = None):
+        """エラーログを記録"""
+        error_message = f"エラー発生: {str(error)}"
         if context:
-            error_msg += f"\nコンテキスト: {context}"
-        self.logger.error(error_msg, exc_info=True)
-
-    def log_warning(self, message: str, context: Optional[Dict[str, Any]] = None) -> None:
-        """警告情報をログに記録"""
-        warning_msg = message
+            error_message += f"\nコンテキスト: {context}"
+        self.logger.error(error_message, exc_info=error)
+    
+    def log_warning(self, message: str, context: dict = None):
+        """警告ログを記録"""
+        warning_message = message
         if context:
-            warning_msg += f"\nコンテキスト: {context}"
-        self.logger.warning(warning_msg)
+            warning_message += f"\nコンテキスト: {context}"
+        self.logger.warning(warning_message)
 
-    def log_frame_extraction(self, frame_count: int, duration: float) -> None:
-        """フレーム抽出情報をログに記録"""
-        self.logger.info(
-            f"フレーム抽出完了:\n"
-            f"- 抽出フレーム数: {frame_count}\n"
-            f"- 動画長: {duration:.2f}秒\n"
-            f"- 平均フレームレート: {frame_count/duration:.2f}fps"
-        )
-
-    def log_transcription(self, segment_count: int, total_duration: float) -> None:
-        """音声認識情報をログに記録"""
-        self.logger.info(
-            f"音声認識完了:\n"
-            f"- セグメント数: {segment_count}\n"
-            f"- 総時間: {total_duration:.2f}秒"
-        )
-
-    def log_performance_stats(self, stats: Dict[str, Any]) -> None:
-        """パフォーマンス統計情報をログに記録"""
-        self.logger.info(
-            f"パフォーマンス統計:\n"
-            f"- メモリ使用量: {stats.get('memory_usage', 'N/A')}MB\n"
-            f"- CPU使用率: {stats.get('cpu_usage', 'N/A')}%\n"
-            f"- 処理時間: {stats.get('processing_time', 'N/A')}秒"
-        )
-
-    def log_step_start(self, step_name: str) -> None:
-        """処理ステップの開始をログに記録"""
-        self.logger.info(f"ステップ開始: {step_name}")
-
-    def log_step_complete(self, message: str) -> None:
-        """処理ステップの完了をログに記録"""
-        self.logger.info(f"ステップ完了: {message}") 
+# デフォルトロガーの設定
+default_logger = get_logger("video_processor")

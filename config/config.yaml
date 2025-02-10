@@ -2,27 +2,100 @@
 output:
   directory: "./output"
   formats: ["json", "txt"]
+  intermediate_files:
+    transcription: "transcription.json"
+    ocr: "ocr_results.json"
+    summaries: "summaries.json"
+  final_file: "final_result.json"
+  save_intermediate: true  # 中間ファイルを保存するかどうか
+
+# モデル設定
+models:
+  whisper_model: "large-v3"
+  tesseract_path: "/opt/homebrew/bin/tesseract"
+  gemini:
+    model_name: "gemini-pro"
+    temperature: 0.3
+    top_p: 0.8
+    top_k: 40
+    max_output_tokens: 8192  # Gemini 1.5 Proの最大出力トークン
+    chunk_size: 10000       # より大きなチャンクサイズ(2M入力対応)
+    min_chunk_size: 1000    # より大きな最小チャンクサイズ
+    safety_settings:
+      harassment: "BLOCK_MEDIUM_AND_ABOVE"
+      hate_speech: "BLOCK_MEDIUM_AND_ABOVE"
+      sexually_explicit: "BLOCK_MEDIUM_AND_ABOVE"
+      dangerous_content: "BLOCK_MEDIUM_AND_ABOVE"
+
+# 音声設定
+audio:
+  format: "wav"
+  sample_rate: 44100  # デフォルトのサンプルレート
+  channels: 2         # ステレオ
+  bit_depth: 16       # 16ビット
+  codec: "pcm_s16le"  # WAV形式用のコーデック
 
 # 音声認識設定
 speech_recognition:
   language: "ja"
   engine: "whisper"
-  whisper_model: "large-v3"  # 単語レベルのタイムスタンプ対応モデル
   min_confidence: 0.7
   temperature: 0.0
   beam_size: 5
 
 # スクリーンショット設定
 screenshot:
-  interval: 5  # 秒単位
+  interval: 5
   format: "png"
   quality: 85
+  frame_extraction:
+    base_frames_per_hour: 1000  # 1時間あたりの基本フレーム数
+    min_frames: 100            # 最小フレーム数
+    important_frame_ratio: 0.05 # 重要フレームの比率(5%)
+    min_important_frames: 10   # 最小重要フレーム数
+    scene_detection:
+      motion_weight: 0.6      # 動きの検出の重み
+      edge_weight: 0.4        # エッジ変化の重み
+      importance_threshold: 6.0  # 重要シーンと判断するスコアの閾値
 
 # OCR設定
 ocr:
   languages: "jpn+eng"
-  config: "--psm 6 --oem 3 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン・ー"
-  page_seg_mode: 6  # 単一の均一なテキストブロックとして処理
+  config: "--psm 6 --oem 3"
+  page_seg_mode: 6
+  min_quality: 0.1  # スクリーンショットの品質基準を緩和
+
+# テキスト品質評価設定
+text_quality:
+  min_length: 5      # 最小文字数を5に設定
+  max_length: 1000   # 最大文字数
+  min_char_ratio: 0.3  # 有効文字の最小比率を30%に設定
+
+# キーワード抽出設定
+keyword_extraction:
+  max_keywords: 10      # 抽出する最大キーワード数
+  min_word_length: 2    # キーワードの最小文字数
+  min_frequency: 2      # キーワードの最小出現回数
+
+# トピック抽出設定
+topic_extraction:
+  max_topics: 5         # 抽出する最大トピック数
+  min_topic_length: 10  # トピックの最小文字数
+  min_importance: 0.5   # トピックの最小重要度
+
+# Notion連携設定
+notion:
+  enabled: true  # Notion連携を有効化
+  database_id: "19225eac-48e3-8036-9930-f9a85397d069"  # 実際のデータベースID
+  sync_interval: 60  # 同期間隔(秒)
+  retry_count: 3    # 同期失敗時のリトライ回数
+  properties:
+    title: "Title"
+    summary: "Summary"
+    keywords: "Keywords"
+    duration: "Duration"
+    processed_date: "ProcessedDate"
+    thumbnail: "Thumbnail"
 
 # ログ設定
 logging:
