@@ -1,0 +1,59 @@
+{
+    "results": [
+        {
+            "timestamp": 5,
+            "text": "公園の入口",
+            "confidence": 0.95,
+            "location": {
+                "x": 100,
+                "y": 50,
+                "width": 200,
+                "height": 50
+            }
+        },
+        {
+            "timestamp": 15,
+            "text": "遊具エリア",
+            "confidence": 0.92,
+            "location": {
+                "x": 300,
+                "y": 150,
+                "width": 150,
+                "height": 40
+            }
+        },
+        {
+            "timestamp": 25,
+            "text": "カフェメニュー",
+            "confidence": 0.98,
+            "location": {
+                "x": 50,
+                "y": 200,
+                "width": 250,
+                "height": 60
+            }
+        },
+        {
+            "timestamp": 35,
+            "text": "新商品 抹茶ラテ ¥500",
+            "confidence": 0.96,
+            "location": {
+                "x": 100,
+                "y": 300,
+                "width": 300,
+                "height": 45
+            }
+        },
+        {
+            "timestamp": 50,
+            "text": "書店 新着図書コーナー",
+            "confidence": 0.94,
+            "location": {
+                "x": 200,
+                "y": 400,
+                "width": 400,
+                "height": 55
+            }
+        }
+    ]
+} 

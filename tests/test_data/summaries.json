@@ -1,0 +1,37 @@
+{
+    "segments": [
+        {
+            "start": 0,
+            "end": 10,
+            "summary": "公園での楽しい時間。天気が良く、子供たちと遊んで過ごした。",
+            "key_points": ["天気が良い", "公園で遊ぶ", "子供たちと過ごす"],
+            "importance_score": 0.8
+        },
+        {
+            "start": 15,
+            "end": 25,
+            "summary": "遊具エリアでの活気ある様子。多くの子供たちが元気に遊んでいた。",
+            "key_points": ["遊具エリア", "子供たちの活動", "賑やかな雰囲気"],
+            "importance_score": 0.7
+        },
+        {
+            "start": 30,
+            "end": 40,
+            "summary": "カフェでの新商品体験。抹茶ラテを試飲し、美味しさを実感。",
+            "key_points": ["新商品", "抹茶ラテ", "カフェでの体験"],
+            "importance_score": 0.9
+        },
+        {
+            "start": 45,
+            "end": 55,
+            "summary": "書店の新着コーナーでの発見。興味深い本との出会い。",
+            "key_points": ["書店", "新着図書", "興味深い本"],
+            "importance_score": 0.75
+        }
+    ],
+    "metadata": {
+        "total_duration": 60,
+        "total_segments": 4,
+        "average_importance": 0.7875
+    }
+} 

@@ -6,156 +6,136 @@ import logging
 import os
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
-from typing import Optional
+from typing import Optional, Dict, Any
+from pathlib import Path
 
-class CustomLogger:
-    """カスタムロガークラス"""
+class Logger:
+    """ロガークラス"""
     
     _instances = {}
     
-    def __new__(cls, name: str, *args, **kwargs):
+    def __new__(cls, config: 'Config', name: str, *args, **kwargs):
         if name not in cls._instances:
             instance = super().__new__(cls)
             cls._instances[name] = instance
             return instance
         return cls._instances[name]
     
-    def __init__(
-        self,
-        name: str,
-        log_dir: str = "logs",
-        log_level: int = logging.INFO,
-        max_bytes: int = 10 * 1024 * 1024,  # 10MB
-        backup_count: int = 5
-    ):
-        if hasattr(self, 'logger'):
-            return
-            
+    def __init__(self, config: 'Config', name: str):
+        """初期化
+        
+        Args:
+            config (Config): 設定オブジェクト
+            name (str): ロガー名
+        """
+        self.name = name
         self.logger = logging.getLogger(name)
+        
+        # 設定から各種パラメータを取得
+        log_config = config.config.get('logging', {})
+        log_level = getattr(logging, log_config.get('level', 'INFO'))
+        log_dir = Path(log_config.get('log_dir', 'logs'))
+        log_file = log_dir / 'video_processing.log'
+        
+        # ログレベルの設定
         self.logger.setLevel(log_level)
         
         # 既存のハンドラをクリア
         self.logger.handlers = []
         
-        # ログディレクトリの作成
-        os.makedirs(log_dir, exist_ok=True)
+        # フォーマッタの作成
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
         
-        # ファイル名の設定
-        log_file = os.path.join(log_dir, f"{name}.log")
+        # ディレクトリの作成
+        log_dir.mkdir(parents=True, exist_ok=True)
         
         # ファイルハンドラの設定
         file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=max_bytes,
-            backupCount=backup_count,
+            str(log_file),
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5,
             encoding='utf-8'
         )
         file_handler.setLevel(log_level)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
         
         # コンソールハンドラの設定
         console_handler = logging.StreamHandler()
         console_handler.setLevel(log_level)
-        
-        # フォーマッタの設定
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        file_handler.setFormatter(formatter)
         console_handler.setFormatter(formatter)
-        
-        # ハンドラの追加
-        self.logger.addHandler(file_handler)
         self.logger.addHandler(console_handler)
     
-    def info(self, message: str) -> None:
-        """
-        INFO レベルのログを記録
+    @classmethod
+    def get_logger(cls, name: str, config: 'Config') -> 'Logger':
+        """ロガーインスタンスを取得
         
         Args:
-            message: ログメッセージ
+            name (str): ロガー名
+            config (Config): 設定オブジェクト
+        
+        Returns:
+            Logger: ロガーインスタンス
         """
-        self.logger.info(message)
+        return cls(config, name)
     
-    def error(self, message: str, exc_info: Optional[Exception] = None) -> None:
-        """
-        ERROR レベルのログを記録
-        
-        Args:
-            message: ログメッセージ
-            exc_info: 例外情報
-        """
-        self.logger.error(message, exc_info=exc_info)
-    
-    def warning(self, message: str) -> None:
-        """
-        WARNING レベルのログを記録
-        
-        Args:
-            message: ログメッセージ
-        """
-        self.logger.warning(message)
-    
-    def debug(self, message: str) -> None:
-        """
-        DEBUG レベルのログを記録
-        
-        Args:
-            message: ログメッセージ
-        """
+    def debug(self, message: str):
+        """デバッグログを出力"""
         self.logger.debug(message)
     
-    def critical(self, message: str, exc_info: Optional[Exception] = None) -> None:
-        """
-        CRITICAL レベルのログを記録
-        
-        Args:
-            message: ログメッセージ
-            exc_info: 例外情報
-        """
-        self.logger.critical(message, exc_info=exc_info)
-
-def get_logger(
-    name: str,
-    log_dir: str = "logs",
-    log_level: int = logging.INFO
-) -> CustomLogger:
-    """
-    ロガーインスタンスを取得
+    def info(self, message: str):
+        """情報ログを出力"""
+        self.logger.info(message)
     
-    Args:
-        name: ロガー名
-        log_dir: ログディレクトリ
-        log_level: ログレベル
+    def warning(self, message: str):
+        """警告ログを出力"""
+        self.logger.warning(message)
     
-    Returns:
-        CustomLogger: カスタムロガーインスタンス
-    """
-    return CustomLogger(name, log_dir, log_level)
+    def error(self, message: str):
+        """エラーログを出力"""
+        self.logger.error(message)
+    
+    def critical(self, message: str):
+        """重大エラーログを出力"""
+        self.logger.critical(message)
+    
+    def exception(self, message: str):
+        """例外ログを出力（スタックトレース付き）"""
+        self.logger.exception(message)
 
 class VideoProcessorLogger:
     """VideoProcessor専用のロガークラス"""
     
-    def __init__(self, config_path=None):
-        """
+    def __init__(self, config: 'Config'):
+        """初期化
+        
         Args:
-            config_path: 設定ファイルのパス
+            config (Config): 設定オブジェクト
         """
-        self.logger = get_logger("video_processor")
-        self.config_path = config_path
+        self.logger = Logger.get_logger("video_processor", config)
     
     def log_error(self, error: Exception, context: dict = None):
-        """エラーログを記録"""
+        """エラーログを記録
+        
+        Args:
+            error (Exception): 発生したエラー
+            context (dict, optional): エラーのコンテキスト
+        """
         error_message = f"エラー発生: {str(error)}"
         if context:
             error_message += f"\nコンテキスト: {context}"
-        self.logger.error(error_message, exc_info=error)
+        self.logger.exception(error_message)
     
     def log_warning(self, message: str, context: dict = None):
-        """警告ログを記録"""
+        """警告ログを記録
+        
+        Args:
+            message (str): 警告メッセージ
+            context (dict, optional): 警告のコンテキスト
+        """
         warning_message = message
         if context:
             warning_message += f"\nコンテキスト: {context}"
         self.logger.warning(warning_message)
-
-# デフォルトロガーの設定
-default_logger = get_logger("video_processor")

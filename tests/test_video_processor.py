@@ -1,10 +1,55 @@
 import os
+import unittest
 import pytest
-from src.video_processor import VideoProcessor
+from unittest.mock import patch, MagicMock
+from src.video_processor import VideoProcessor, VideoProcessingError
+from pathlib import Path
+from datetime import datetime
+import json
+import shutil
+import tempfile
+
+from src.utils.config import Config
+
+@pytest.fixture(autouse=True)
+def setup_environment():
+    """テスト環境のセットアップ"""
+    with patch.dict(os.environ, {'GOOGLE_API_KEY': 'test_api_key'}):
+        yield
 
 @pytest.fixture
-def video_processor():
-    return VideoProcessor(output_dir='test_output')
+def mock_gemini():
+    """Geminiモデルのモック"""
+    with patch('google.generativeai.GenerativeModel') as mock:
+        mock_model = MagicMock()
+        mock_model.generate_content.return_value.text = '{"heading": "テスト", "summary": "要約", "key_points": ["ポイント1"]}'
+        mock.return_value = mock_model
+        yield mock
+
+@pytest.fixture
+def video_processor(mock_gemini):
+    """VideoProcessorのインスタンスを作成"""
+    config = {
+        'video_processor': {
+            'output_dir': 'test_output',
+            'temp_dir': 'temp',
+            'log_dir': 'logs'
+        },
+        'frame_extractor': {
+            'output_dir': 'test_output/frames',
+            'frame_interval': 1
+        },
+        'audio_extractor': {
+            'output_dir': 'test_output/audio'
+        },
+        'ocr_processor': {
+            'min_confidence': 0.6
+        },
+        'text_analyzer': {
+            'model_name': 'ja_core_news_lg'
+        }
+    }
+    return VideoProcessor(config)
 
 def test_process_segment(video_processor):
     # テスト用のセグメントデータ
@@ -121,4 +166,86 @@ def teardown_module(module):
     """テスト終了後のクリーンアップ"""
     import shutil
     if os.path.exists('test_output'):
-        shutil.rmtree('test_output') 
+        shutil.rmtree('test_output')
+
+class TestVideoProcessor(unittest.TestCase):
+    """VideoProcessorのテストケース"""
+    
+    def setUp(self):
+        """テストの前準備"""
+        # テスト用の一時ディレクトリを作成
+        self.test_dir = Path(tempfile.mkdtemp())
+        self.output_dir = self.test_dir / "output"
+        self.temp_dir = self.test_dir / "temp"
+        
+        # テスト用の設定を作成
+        self.config = {
+            "video_processor": {
+                "output_dir": str(self.output_dir),
+                "temp_dir": str(self.temp_dir)
+            },
+            "frame_extractor": {},
+            "audio_extractor": {},
+            "transcription": {},
+            "ocr_processor": {},
+            "text_analyzer": {},
+            "notion_sync": {
+                "auth_token": "test_token",
+                "database_id": "test_db"
+            }
+        }
+        
+        self.processor = VideoProcessor(self.config)
+        self.test_video = "test_video.mp4"
+
+    def test_intermediate_files_creation(self):
+        """中間ファイルの生成テスト"""
+        # モックデータの準備
+        mock_frames = [{"timestamp": 0, "path": "frame_0.jpg"}]
+        mock_ocr_results = {"text": "test OCR"}
+        mock_transcription = {"text": "test transcription"}
+        mock_analysis = {"summary": "test analysis"}
+        
+        # 各メソッドをモック化
+        with patch.object(self.processor.frame_extractor, 'extract_frames', return_value=mock_frames), \
+             patch.object(self.processor.audio_extractor, 'extract_audio', return_value="test.wav"), \
+             patch.object(self.processor.transcription_processor, 'transcribe_audio', return_value=mock_transcription), \
+             patch.object(self.processor.ocr_processor, 'process_frames', return_value=mock_ocr_results), \
+             patch.object(self.processor.text_analyzer, 'analyze_content', return_value=mock_analysis), \
+             patch.object(self.processor.report_generator, 'generate_report'), \
+             patch.object(self.processor.notion_sync, 'sync_results', return_value={"url": "test_url"}):
+            
+            # テスト実行
+            result = self.processor.process_video(self.test_video)
+            
+            # 中間ファイルの存在確認
+            self.assertTrue((self.temp_dir / "frames.json").exists())
+            self.assertTrue((self.temp_dir / "ocr_results.json").exists())
+            self.assertTrue((self.temp_dir / "transcription.json").exists())
+            self.assertTrue((self.temp_dir / "analysis.json").exists())
+            self.assertTrue((self.output_dir / "final_result.json").exists())
+            self.assertTrue((self.output_dir / "report.html").exists())
+            
+            # 中間ファイルの内容検証
+            with open(self.temp_dir / "ocr_results.json", "r") as f:
+                ocr_data = json.load(f)
+                self.assertEqual(ocr_data, mock_ocr_results)
+            
+            with open(self.temp_dir / "transcription.json", "r") as f:
+                transcription_data = json.load(f)
+                self.assertEqual(transcription_data, mock_transcription)
+            
+            # 結果の検証
+            self.assertEqual(result["status"], "success")
+            self.assertIn("timestamp", result)
+            self.assertEqual(result["video_path"], self.test_video)
+            self.assertEqual(result["output_dir"], str(self.output_dir))
+            self.assertEqual(result["notion_page_url"], "test_url")
+    
+    def tearDown(self):
+        """テストのクリーンアップ"""
+        # テストディレクトリの削除
+        shutil.rmtree(self.test_dir)
+
+if __name__ == '__main__':
+    unittest.main() 

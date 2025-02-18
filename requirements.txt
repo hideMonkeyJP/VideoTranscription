@@ -1,14 +1,25 @@
-numpy<2  # NumPy 2.x互換性問題のため1.x系に固定
-opencv-python==4.11.0.86
+# Core dependencies
+numpy==1.24.3
+opencv-python==4.8.0.76
+ffmpeg-python==0.2.0
+python-dotenv==1.0.0
+
+# NLP and ML
+google-generativeai==0.3.1
+
+# OCR
 pytesseract==0.3.10
-scikit-learn==1.4.2
-moviepy==1.0.3
-Pillow==10.3.0
-openai-whisper==20231117  # 公式パッケージ名に修正
-python-dotenv==1.0.1
-mecab-python3==1.0.8
-unidic-lite==1.0.8  # 日本語形態素解析用辞書
-google-generative-ai==0.3.2  # Gemini API
-requests==2.31.0  # HTTP通信用
-pytest==8.0.0  # テスト用
-pytest-mock==3.12.0  # モック用
+
+# Web and templating
+jinja2==3.1.2
+markdown==3.4.4
+
+# Testing
+pytest==7.4.0
+pytest-cov==4.1.0
+
+# Development
+black==23.7.0
+flake8==6.1.0
+mypy==1.5.1
+isort==5.12.0

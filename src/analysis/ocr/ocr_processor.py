@@ -1,11 +1,13 @@
 import os
 import cv2
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import pytesseract
 from typing import Dict, List, Any, Optional
 import logging
 from pathlib import Path
+from collections import Counter
+import itertools
 
 class OCRError(Exception):
     """OCR処理に関するエラー"""
@@ -46,11 +48,29 @@ class OCRProcessor:
             np.ndarray: 前処理済みの画像
         """
         try:
-            # PILからOpenCVの形式に変換
-            img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+            # PILでの前処理
+            # 1. グレースケール変換
+            image = image.convert('L')
+            
+            # 2. コントラスト強調
+            enhancer = ImageEnhance.Contrast(image)
+            image = enhancer.enhance(2.5)
+            
+            # 3. シャープネス強調
+            enhancer = ImageEnhance.Sharpness(image)
+            image = enhancer.enhance(2.5)
+            
+            # 4. ノイズ除去
+            image = image.filter(ImageFilter.MedianFilter(size=3))
+            
+            # OpenCVの形式に変換
+            img = np.array(image)
             
             # グレースケール変換
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            if len(img.shape) == 3:  # カラー画像の場合
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            else:  # すでにグレースケールの場合
+                gray = img
             
             # ノイズ除去
             denoised = cv2.fastNlMeansDenoising(gray)
@@ -100,21 +120,22 @@ class OCRProcessor:
             
             # 結果の解析と信頼度フィルタリング
             texts = []
+            
             for i in range(len(result['text'])):
                 confidence = float(result['conf'][i])
-                if confidence >= self.min_confidence and result['text'][i].strip():
-                    text_info = {
-                        'text': result['text'][i],
+                text = result['text'][i].strip()
+                
+                if confidence >= self.min_confidence and text:
+                    texts.append({
+                        'text': text,
                         'confidence': confidence,
                         'position': {
                             'left': result['left'][i],
                             'top': result['top'][i],
                             'width': result['width'][i],
                             'height': result['height'][i]
-                        },
-                        'timestamp': timestamp
-                    }
-                    texts.append(text_info)
+                        }
+                    })
             
             return {
                 'texts': texts,
@@ -133,32 +154,123 @@ class OCRProcessor:
                 "error": str(e)
             })
             
-    def process_frames(self, frames: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """複数のフレームに対してOCR処理を実行します
-        
-        Args:
-            frames (List[Dict[str, Any]]): フレーム情報のリスト
+    def _calculate_text_quality(self, text: str) -> float:
+        """テキストの品質スコアを計算します"""
+        if not text or len(text.strip()) < 3:
+            return 0.0
+
+        # 基本スコアの初期化
+        score = 1.0
+
+        # 1. 文字種類の評価
+        chars = Counter(text)
+        unique_ratio = len(chars) / len(text)
+        score *= min(1.0, unique_ratio * 2)  # 文字の多様性を評価
+
+        # 2. 意味のある文字の割合
+        meaningful_chars = sum(1 for c in text if c.isalnum() or 0x3000 <= ord(c) <= 0x9FFF)
+        meaningful_ratio = meaningful_chars / len(text)
+        score *= meaningful_ratio
+
+        # 3. 記号の割合評価
+        symbol_ratio = sum(1 for c in text if not c.isalnum() and not 0x3000 <= ord(c) <= 0x9FFF) / len(text)
+        score *= (1.0 - min(1.0, symbol_ratio * 2))
+
+        # 4. パターン検出
+        # 連続する同じ文字
+        max_repeat = max(len(list(g)) for _, g in itertools.groupby(text))
+        if max_repeat > 3:
+            score *= 0.5
+
+        # 5. 日本語文字の評価
+        jp_ratio = sum(1 for c in text if 0x3000 <= ord(c) <= 0x9FFF) / len(text)
+        if jp_ratio > 0:
+            score *= (1.0 + jp_ratio)  # 日本語文字が含まれる場合はスコアを上げる
+
+        # 6. アルファベットの評価
+        if text.isascii():
+            # 母音の存在確認
+            vowel_ratio = sum(1 for c in text.lower() if c in 'aeiou') / len(text)
+            if vowel_ratio < 0.1:  # 母音が少なすぎる場合
+                score *= 0.5
+
+        return min(1.0, score)
+
+    def process_frames_detailed(self, frames: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """フレームを処理してOCR結果を返します（詳細バージョン）"""
+        try:
+            screenshots = []
+            for frame in frames:
+                result = self.extract_text(frame['image'], frame.get('timestamp', 0))
+                if result and result.get('texts'):
+                    # OCRの信頼度評価
+                    confidences = [text_info['confidence'] / 100.0 for text_info in result['texts']]
+                    ocr_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+
+                    # テキスト品質評価
+                    all_text = ' '.join(text_info['text'] for text_info in result['texts'])
+                    text_quality_score = self._calculate_text_quality(all_text)
+
+                    # 重要度スコアの計算
+                    importance_score = (
+                        ocr_confidence * 0.4 +          # OCR信頼度(40%)
+                        text_quality_score * 0.4 +      # テキスト品質(40%)
+                        frame.get('scene_change_score', 0.0) * 0.2  # シーン変化(20%)
+                    )
+
+                    # スクリーンショットの追加
+                    screenshots.append({
+                        'timestamp': frame.get('timestamp', 0),
+                        'frame_number': frame.get('frame_number', 0),
+                        'importance_score': min(importance_score, 1.0),
+                        'ocr_confidence': ocr_confidence,
+                        'text_quality_score': text_quality_score,
+                        'texts': result['texts']
+                    })
             
-        Returns:
-            List[Dict[str, Any]]: OCR結果のリスト
-        """
-        results = []
-        for frame in frames:
-            try:
-                image = frame.get('image')
-                timestamp = frame.get('timestamp', 0.0)
-                
-                if not image:
-                    continue
-                    
-                result = self.extract_text(image, timestamp)
-                result['frame_number'] = frame.get('frame_number')
-                results.append(result)
-                
-            except Exception as e:
-                self.logger.warning(
-                    f"フレーム {frame.get('frame_number')} の処理中にエラー: {str(e)}"
-                )
-                continue
-                
-        return results
+            return {
+                'screenshots': screenshots
+            }
+            
+        except Exception as e:
+            self.logger.error(f"フレーム処理中にエラーが発生: {str(e)}")
+            raise OCRError(f"フレーム処理に失敗しました: {str(e)}")
+
+    def process_frames(self, frames: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """フレームを処理してOCR結果を返します（シンプルバージョン）"""
+        try:
+            screenshots = []
+            for frame in frames:
+                result = self.extract_text(frame['image'], frame.get('timestamp', 0))
+                if result and result.get('texts'):
+                    # OCRの信頼度評価
+                    confidences = [text_info['confidence'] / 100.0 for text_info in result['texts']]
+                    ocr_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+
+                    # テキスト品質評価
+                    all_text = ' '.join(text_info['text'] for text_info in result['texts'])
+                    text_quality_score = self._calculate_text_quality(all_text)
+
+                    # 重要度スコアの計算
+                    importance_score = (
+                        ocr_confidence * 0.4 +          # OCR信頼度(40%)
+                        text_quality_score * 0.4 +      # テキスト品質(40%)
+                        frame.get('scene_change_score', 0.0) * 0.2  # シーン変化(20%)
+                    )
+
+                    # スクリーンショットの追加（シンプルな形式）
+                    screenshots.append({
+                        'timestamp': frame.get('timestamp', 0),
+                        'frame_number': frame.get('frame_number', 0),
+                        'importance_score': min(importance_score, 1.0),
+                        'text': all_text,
+                        'image_path': frame.get('path', '')  # 画像パスを追加
+                    })
+            
+            return {
+                'screenshots': screenshots
+            }
+            
+        except Exception as e:
+            self.logger.error(f"フレーム処理中にエラーが発生: {str(e)}")
+            raise OCRError(f"フレーム処理に失敗しました: {str(e)}")

@@ -1,0 +1,562 @@
+import os
+import pytest
+import json
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+from src.video_processor import VideoProcessor
+from src.utils.config import Config
+import cv2
+from PIL import Image
+from typing import List, Dict, Any
+
+# 中間ファイルのパス定義
+TEMP_DIR = Path('output/temp')
+PATHS = {
+    'frames': TEMP_DIR / 'frames.json',
+    'ocr': TEMP_DIR / 'ocr_results.json',
+    'transcription': TEMP_DIR / 'transcription.json',
+    'screenshots': Path('output/screenshots'),
+    'audio': Path('output/audio')
+}
+
+def ensure_dir(path: Path) -> Path:
+    """ディレクトリの存在確認と作成"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path
+
+def validate_json_file(path: Path, required_keys: List[str]) -> bool:
+    """JSONファイルの妥当性確認"""
+    try:
+        if not path.exists():
+            return False
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                return all(all(key in item for key in required_keys) for item in data if item)
+            return all(key in data for key in required_keys)
+    except Exception:
+        return False
+
+@pytest.fixture
+def mock_gemini():
+    """Geminiモデルのモック"""
+    with patch('google.generativeai.GenerativeModel') as mock:
+        mock_model = MagicMock()
+        mock_response = MagicMock()
+        mock_response.text = json.dumps({
+            "heading": "タスク管理の重要性",
+            "summary": "タスク管理は稼げる人とできない人の大きな差となり、タスク考える時間や切り替えの時間を削減することが重要",
+            "key_points": [
+                "タスク管理が成功の鍵",
+                "時間の無駄を省く",
+                "効率的な管理方法の導入"
+            ]
+        })
+        mock_model.generate_content.return_value = mock_response
+        mock.return_value = mock_model
+        yield mock
+
+class TestVideoProcessing:
+    """動画処理の統合テスト"""
+
+    @pytest.fixture
+    def processor_config(self, tmp_path):
+        """テスト用の設定"""
+        return {
+            'video_processor': {
+                'output_dir': 'output',
+                'temp_dir': 'output/temp'
+            },
+            'frame_extractor': {
+                'interval': 0.52,
+                'quality': 95,
+                'frames_per_hour': 6923,
+                'important_frames_ratio': 0.05,
+                'min_scene_change': 0.3
+            },
+            'audio_extractor': {
+                'format': 'wav',
+                'sample_rate': 44100
+            },
+            'transcription': {
+                'model': 'whisper-1',
+                'language': 'ja'
+            },
+            'ocr_processor': {
+                'engine': 'claude',
+                'confidence_threshold': 0.7
+            },
+            'text_analyzer': {
+                'model': 'gemini-pro',
+                'max_tokens': 1000
+            },
+            'notion': {
+                'enabled': False
+            }
+        }
+
+    def test_frame_extraction(self, processor_config):
+        """ステップ1: フレーム抽出のテスト"""
+        frames_json = ensure_dir(PATHS['frames'])
+        
+        # 既存ファイルの妥当性確認
+        if validate_json_file(frames_json, ['timestamp', 'frame_number']):
+            print("\n=== ステップ1: フレーム抽出（キャッシュ使用） ===")
+            with open(frames_json, 'r', encoding='utf-8') as f:
+                frames_data = json.load(f)
+            print(f"キャッシュされたフレーム数: {len(frames_data)}")
+            assert len(frames_data) > 0, "フレームデータが空です"
+            return frames_data
+
+        try:
+            print("\n=== ステップ1: フレーム抽出（新規実行） ===")
+            processor = VideoProcessor(processor_config)
+            video_path = "videos/Sample.mp4"
+            
+            # 入力ファイルの存在確認
+            assert Path(video_path).exists(), f"動画ファイルが見つかりません: {video_path}"
+            
+            print("フレーム抽出を開始...")
+            frames = processor.frame_extractor.extract_frames(str(video_path))
+            assert frames, "フレーム抽出に失敗しました"
+            
+            # スクリーンショットの保存
+            screenshots_dir = ensure_dir(PATHS['screenshots'])
+            saved_paths = processor.frame_extractor.save_frames(frames, str(screenshots_dir))
+            assert saved_paths, "フレームの保存に失敗しました"
+            
+            # フレームデータの整形と保存
+            frames_data = [{
+                'timestamp': frame.get('timestamp', 0),
+                'frame_number': frame.get('frame_number', 0),
+                'scene_change_score': frame.get('scene_change_score', 0),
+                'path': str(path) if isinstance(path, Path) else path
+            } for frame, path in zip(frames, saved_paths)]
+            
+            with open(frames_json, 'w', encoding='utf-8') as f:
+                json.dump(frames_data, f, ensure_ascii=False, indent=2)
+            
+            print(f"抽出されたフレーム数: {len(frames)}")
+            print(f"フレーム情報を保存: {frames_json}")
+            
+            return frames_data
+            
+        except Exception as e:
+            pytest.fail(f"フレーム抽出でエラーが発生: {str(e)}")
+
+    def test_ocr_processing(self, processor_config):
+        """ステップ2: OCR処理のテスト"""
+        ocr_json = ensure_dir(PATHS['ocr'])
+        
+        # 既存ファイルの妥当性確認
+        if validate_json_file(ocr_json, ['screenshots']):
+            print("\n=== ステップ2: OCR処理（キャッシュ使用） ===")
+            with open(ocr_json, 'r', encoding='utf-8') as f:
+                ocr_results = json.load(f)
+            print(f"キャッシュされたOCR結果数: {len(ocr_results['screenshots'])}")
+            assert 'screenshots' in ocr_results, "OCR結果の形式が不正です"
+            return ocr_results
+
+        try:
+            print("\n=== ステップ2: OCR処理（新規実行） ===")
+            
+            # フレーム情報の読み込み
+            frames_data = self.test_frame_extraction(processor_config)
+            assert frames_data, "フレーム情報の読み込みに失敗しました"
+            
+            # 画像の読み込みと検証
+            frames_with_images = []
+            for frame in frames_data:
+                image_path = Path(frame['path'])
+                assert image_path.exists(), f"画像ファイルが見つかりません: {image_path}"
+                
+                try:
+                    image = Image.open(str(image_path))
+                    frames_with_images.append({
+                        **frame,
+                        'image': image
+                    })
+                except Exception as e:
+                    pytest.fail(f"画像の読み込みに失敗: {str(e)}")
+            
+            processor = VideoProcessor(processor_config)
+            print(f"処理対象フレーム数: {len(frames_with_images)}")
+            
+            ocr_results = processor.ocr_processor.process_frames(frames_with_images)
+            assert ocr_results and 'screenshots' in ocr_results, "OCR処理に失敗しました"
+            
+            with open(ocr_json, 'w', encoding='utf-8') as f:
+                json.dump(ocr_results, f, ensure_ascii=False, indent=2)
+            
+            print(f"OCR結果を保存: {ocr_json}")
+            return ocr_results
+            
+        except Exception as e:
+            pytest.fail(f"OCR処理でエラーが発生: {str(e)}")
+
+    def test_audio_transcription(self, processor_config):
+        """ステップ3: 音声処理のテスト"""
+        transcription_json = ensure_dir(PATHS['transcription'])
+        
+        # 既存ファイルの妥当性確認
+        if validate_json_file(transcription_json, ['text', 'start', 'end']):
+            print("\n=== ステップ3: 音声処理（キャッシュ使用） ===")
+            with open(transcription_json, 'r', encoding='utf-8') as f:
+                transcription = json.load(f)
+            print(f"キャッシュされた文字起こしセグメント数: {len(transcription)}")
+            assert len(transcription) > 0, "文字起こし結果が空です"
+            return transcription
+
+        try:
+            print("\n=== ステップ3: 音声処理（新規実行） ===")
+            processor = VideoProcessor(processor_config)
+            video_path = "videos/Sample.mp4"
+            
+            # 入力ファイルの存在確認
+            assert Path(video_path).exists(), f"動画ファイルが見つかりません: {video_path}"
+            
+            print("音声抽出を開始...")
+            audio_dir = ensure_dir(PATHS['audio'])
+            audio_path = processor.audio_extractor.extract_audio(str(video_path))
+            assert Path(audio_path).exists(), f"音声ファイルの抽出に失敗しました: {audio_path}"
+            
+            print("文字起こしを開始...")
+            transcription = processor.transcription_processor.transcribe_audio(audio_path)
+            assert transcription, "文字起こしに失敗しました"
+            
+            with open(transcription_json, 'w', encoding='utf-8') as f:
+                json.dump(transcription, f, ensure_ascii=False, indent=2)
+            
+            print(f"文字起こし結果を保存: {transcription_json}")
+            return transcription
+            
+        except Exception as e:
+            pytest.fail(f"音声処理でエラーが発生: {str(e)}")
+
+    def test_basic_video_processing(self, tmp_path, processor_config, mock_gemini):
+        """基本的な動画処理のテスト"""
+        try:
+            print("\n=== 1. 動画処理フェーズ ===\n")
+            
+            # VideoProcessorの初期化
+            processor = VideoProcessor(processor_config)
+            
+            # テスト用動画のパス
+            video_path = "videos/Sample.mp4"
+            # 動画処理の実行
+            result = processor.process_video(video_path, 'output')
+            
+            print("\n=== 2. 結果の検証 ===\n")
+            
+            # 1. 処理結果の基本検証
+            assert result['status'] == 'success', "処理が失敗しました"
+            assert 'timestamp' in result, "タイムスタンプがありません"
+            assert 'output_files' in result, "出力ファイル情報がありません"
+            
+            # 2. 出力ファイルの存在確認
+            output_files = result['output_files']
+            for key, path in output_files.items():
+                assert os.path.exists(path), f"{key}のファイルが存在しません: {path}"
+            
+            # 3. 中間ファイルの存在確認
+            assert os.path.exists(output_files['frames']), "フレーム情報ファイルが存在しません"
+            assert os.path.exists(output_files['ocr']), "OCR結果ファイルが存在しません"
+            assert os.path.exists(output_files['transcription']), "文字起こしファイルが存在しません"
+            assert os.path.exists(output_files['analysis']), "分析結果ファイルが存在しません"
+            
+            # 4. 最終結果ファイルの基本構造確認
+            final_result_path = output_files['final']
+            with open(final_result_path, 'r', encoding='utf-8') as f:
+                final_result = json.load(f)
+                
+            # メタデータの存在確認
+            assert 'metadata' in final_result, "メタデータがありません"
+            assert 'processed_at' in final_result['metadata'], "処理時刻がありません"
+            
+            # 文字起こし結果の存在確認
+            assert 'transcription' in final_result, "文字起こし結果がありません"
+            
+            # 分析結果の存在確認
+            assert 'analysis' in final_result, "分析結果がありません"
+            
+            print("\nすべてのテストが成功しました!")
+            
+        except Exception as e:
+            pytest.fail(f"統合テストでエラーが発生しました: {str(e)}")
+
+    def test_ocr_accuracy(self, tmp_path, processor_config, mock_gemini):
+        """OCR処理の精度テスト"""
+        try:
+            # VideoProcessorの初期化
+            processor = VideoProcessor(processor_config)
+            
+            # テスト用動画のパス
+            video_path = "videos/Sample.mp4"
+            # 動画処理の実行
+            result = processor.process_video(video_path, 'output')
+            
+            # スクリーンショットの確認
+            screenshots_dir = result['output_files']['screenshots_dir']
+            assert os.path.exists(screenshots_dir), "スクリーンショットディレクトリが存在しません"
+            
+            # スクリーンショットファイルの確認
+            screenshot_files = list(Path(screenshots_dir).glob('*.jpg'))
+            assert len(screenshot_files) > 0, "スクリーンショットが保存されていません"
+            
+            # OCR結果の検証
+            ocr_path = result['output_files']['ocr']
+            with open(ocr_path, 'r', encoding='utf-8') as f:
+                ocr_results = json.load(f)
+            
+            # 1. OCR結果の基本構造確認
+            assert 'screenshots' in ocr_results, "スクリーンショット情報がありません"
+            assert isinstance(ocr_results['screenshots'], list), "スクリーンショット情報がリスト形式ではありません"
+            assert len(ocr_results['screenshots']) > 0, "OCR結果が空です"
+            
+            # 2. 各スクリーンショットの検証
+            for screenshot in ocr_results['screenshots']:
+                # タイムスタンプの存在確認
+                assert 'timestamp' in screenshot, "タイムスタンプがありません"
+                assert isinstance(screenshot['timestamp'], (int, float)), "タイムスタンプが数値ではありません"
+                
+                # フレーム番号の存在確認
+                assert 'frame_number' in screenshot, "フレーム番号がありません"
+                assert isinstance(screenshot['frame_number'], int), "フレーム番号が整数ではありません"
+                
+                # 重要度スコアの存在確認
+                assert 'importance_score' in screenshot, "重要度スコアがありません"
+                assert isinstance(screenshot['importance_score'], (int, float)), "重要度スコアが数値ではありません"
+                
+                # OCRテキストの存在確認(存在する場合)
+                if 'text' in screenshot:
+                    assert isinstance(screenshot['text'], str), "OCRテキストが文字列ではありません"
+                    assert len(screenshot['text'].strip()) > 0, "OCRテキストが空です"
+            
+            print("\nOCR精度テストが成功しました!")
+            
+        except Exception as e:
+            pytest.fail(f"OCR精度テストでエラーが発生しました: {str(e)}")
+
+    def test_transcription_accuracy(self, tmp_path, processor_config, mock_gemini):
+        """音声認識の精度テスト"""
+        try:
+            # VideoProcessorの初期化
+            processor = VideoProcessor(processor_config)
+            
+            # テスト用動画のパス
+            video_path = "videos/Sample.mp4"
+            # 動画処理の実行
+            result = processor.process_video(video_path, 'output')
+            
+            # 音声ファイルの確認
+            audio_dir = Path('output/audio')
+            assert audio_dir.exists(), "音声ディレクトリが存在しません"
+            
+            audio_files = list(audio_dir.glob('*.wav'))
+            assert len(audio_files) > 0, "音声ファイルが保存されていません"
+            
+            # 文字起こし結果の検証
+            transcription_path = result['output_files']['transcription']
+            with open(transcription_path, 'r', encoding='utf-8') as f:
+                transcription = json.load(f)
+            
+            # 1. 文字起こし結果の基本構造確認
+            assert isinstance(transcription, list), "文字起こし結果がリスト形式ではありません"
+            assert len(transcription) > 0, "文字起こし結果が空です"
+            
+            # 2. 各セグメントの検証
+            for segment in transcription:
+                # テキストの存在確認
+                assert 'text' in segment, "テキストがありません"
+                assert isinstance(segment['text'], str), "テキストが文字列ではありません"
+                assert len(segment['text']) > 0, "テキストが空です"
+                
+                # タイムスタンプの存在確認
+                assert 'start' in segment, "開始時間がありません"
+                assert 'end' in segment, "終了時間がありません"
+                assert isinstance(segment['start'], (int, float)), "開始時間が数値ではありません"
+                assert isinstance(segment['end'], (int, float)), "終了時間が数値ではありません"
+                assert segment['start'] < segment['end'], "開始時間が終了時間より後になっています"
+            
+            print("\n音声認識精度テストが成功しました!")
+            
+        except Exception as e:
+            pytest.fail(f"音声認識精度テストでエラーが発生しました: {str(e)}")
+
+    def test_text_analysis_quality(self, tmp_path, processor_config, mock_gemini):
+        """テキスト要約の品質テスト"""
+        try:
+            # VideoProcessorの初期化
+            processor = VideoProcessor(processor_config)
+            
+            # テスト用動画のパス
+            video_path = "videos/Sample.mp4"
+            # 動画処理の実行
+            result = processor.process_video(video_path, 'output')
+            
+            # 分析結果の検証
+            analysis_path = result['output_files']['analysis']
+            with open(analysis_path, 'r', encoding='utf-8') as f:
+                analysis = json.load(f)
+            
+            # 1. 分析結果の基本構造確認
+            assert 'segments' in analysis, "セグメント情報がありません"
+            assert isinstance(analysis['segments'], list), "セグメント情報がリスト形式ではありません"
+            assert len(analysis['segments']) > 0, "セグメントが空です"
+            
+            # 2. 各セグメントの検証
+            for segment in analysis['segments']:
+                # 時間範囲の確認
+                assert 'time_range' in segment, "時間範囲がありません"
+                assert 'start' in segment['time_range'], "開始時間がありません"
+                assert 'end' in segment['time_range'], "終了時間がありません"
+                
+                # 要約の確認
+                assert 'summary' in segment, "要約がありません"
+                assert isinstance(segment['summary'], str), "要約が文字列ではありません"
+                assert len(segment['summary']) > 0, "要約が空です"
+                assert len(segment['summary']) < 1000, "要約が長すぎます"
+                
+                # キーポイントの確認
+                assert 'key_points' in segment, "キーポイントがありません"
+                assert isinstance(segment['key_points'], list), "キーポイントがリスト形式ではありません"
+                assert len(segment['key_points']) > 0, "キーポイントが空です"
+                
+                # メタデータの確認
+                assert 'metadata' in segment, "メタデータがありません"
+                assert 'segment_count' in segment['metadata'], "セグメント数がありません"
+                assert 'has_screenshot_text' in segment['metadata'], "スクリーンショットテキスト情報がありません"
+                assert 'summary_points' in segment['metadata'], "要約ポイント数がありません"
+                assert 'keyword_count' in segment['metadata'], "キーワード数がありません"
+            
+            print("\nテキスト要約品質テストが成功しました!")
+            
+        except Exception as e:
+            pytest.fail(f"テキスト要約品質テストでエラーが発生しました: {str(e)}")
+
+    def test_notion_sync(self, tmp_path, processor_config, mock_gemini):
+        """Notion同期機能のテスト"""
+        try:
+            # Notion同期を有効化
+            processor_config['notion']['enabled'] = True
+            processor_config['notion'].update({
+                'database_id': 'test_database_id',
+                'auth_token': 'test_token'
+            })
+            
+            # VideoProcessorの初期化
+            processor = VideoProcessor(processor_config)
+            
+            # テスト用動画のパス
+            video_path = "videos/Sample.mp4"
+            output_dir = tmp_path / 'output'
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # 動画処理の実行
+            result = processor.process_video(video_path, str(output_dir))
+            
+            # Notion同期結果の検証
+            assert 'notion_page_url' in result, "NotionページURLがありません"
+            assert isinstance(result['notion_page_url'], str), "NotionページURLが文字列ではありません"
+            assert result['notion_page_url'].startswith('https://'), "NotionページURLが不正です"
+            
+            print("\nNotion同期テストが成功しました!")
+            
+        except Exception as e:
+            pytest.fail(f"Notion同期テストでエラーが発生しました: {str(e)}")
+
+    def test_report_generation(self, tmp_path, processor_config, mock_gemini):
+        """レポート生成機能のテスト"""
+        try:
+            # VideoProcessorの初期化
+            processor = VideoProcessor(processor_config)
+            
+            # テスト用動画のパス
+            video_path = "videos/Sample.mp4"
+            # 動画処理の実行
+            result = processor.process_video(video_path, 'output')
+            
+            # レポートファイルの確認
+            report_path = result['output_files']['report']
+            assert os.path.exists(report_path), "レポートファイルが存在しません"
+            
+            # レポート内容の検証
+            with open(report_path, 'r', encoding='utf-8') as f:
+                report_content = f.read()
+            
+            # 1. 基本構造の確認
+            assert '<!DOCTYPE html>' in report_content, "HTMLドキュメントではありません"
+            assert '<title>動画分析レポート</title>' in report_content, "タイトルがありません"
+            
+            # 2. メタデータの確認
+            assert 'processed_at' in report_content, "処理時刻がありません"
+            assert 'video_duration' in report_content, "動画長がありません"
+            assert 'segment_count' in report_content, "セグメント数がありません"
+            assert 'screenshot_count' in report_content, "スクリーンショット数がありません"
+            
+            # 3. セグメント情報の確認
+            assert '<div class="segment"' in report_content, "セグメント情報がありません"
+            assert '<div class="summary"' in report_content, "要約情報がありません"
+            assert '<div class="key-points"' in report_content, "キーポイント情報がありません"
+            
+            print("\nレポート生成テストが成功しました!")
+            
+        except Exception as e:
+            pytest.fail(f"レポート生成テストでエラーが発生しました: {str(e)}")
+
+    def test_notion_data_generation(self, tmp_path, processor_config, mock_gemini):
+        """Notion登録用データ生成のテスト"""
+        try:
+            # VideoProcessorの初期化
+            processor = VideoProcessor(processor_config)
+            
+            # テスト用動画のパス
+            video_path = "videos/Sample.mp4"
+            # 動画処理の実行
+            result = processor.process_video(video_path, 'output')
+            
+            # Notion登録用データファイルの確認
+            notion_data_path = result['output_files']['notion_data']
+            assert os.path.exists(notion_data_path), "Notion登録用データファイルが存在しません"
+            
+            # CSVファイルの内容検証
+            import csv
+            with open(notion_data_path, 'r', encoding='utf-8-sig') as f:
+                reader = csv.reader(f)
+                rows = list(reader)
+                
+                # 1. ヘッダー行の確認
+                assert rows[0] == ['Title', 'Summary', 'Keywords', 'Timestamp', 'Thumbnail', 'FileName'], "ヘッダー行が正しくありません"
+                
+                # 2. データ行の確認
+                assert len(rows) > 1, "データ行がありません"
+                for row in rows[1:]:
+                    # カラム数の確認
+                    assert len(row) == 6, "データ行のカラム数が正しくありません"
+                    
+                    # タイトルの形式確認
+                    assert row[0].startswith('文脈'), "タイトルの形式が正しくありません"
+                    
+                    # サマリーの確認
+                    assert len(row[1]) > 0, "サマリーが空です"
+                    
+                    # キーワードの確認
+                    assert len(row[2]) > 0, "キーワードが空です"
+                    
+                    # タイムスタンプの形式確認
+                    assert '秒' in row[3], "タイムスタンプの形式が正しくありません"
+                    
+                    # サムネイルURLの確認
+                    assert row[4].startswith('https://'), "サムネイルURLの形式が正しくありません"
+                    
+                    # ファイル名の形式確認
+                    assert row[5].startswith('screenshot_'), "ファイル名の形式が正しくありません"
+                    assert row[5].endswith('.png'), "ファイル名の拡張子が正しくありません"
+            
+            print("\nNotion登録用データ生成テストが成功しました!")
+            
+        except Exception as e:
+            pytest.fail(f"Notion登録用データ生成テストでエラーが発生しました: {str(e)}")
+
+if __name__ == '__main__':
+    pytest.main(['-v', __file__])

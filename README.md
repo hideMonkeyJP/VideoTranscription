@@ -1,76 +1,144 @@
-# VideoTranscription System
+# VideoTranscription
 
-## システム概要
-本システムは、動画から映像および音声情報を抽出し、各種処理(フレーム抽出、OCR、音声書き起こし、テキスト要約)を経て、処理結果をCSVまたはJSON形式で出力するパイプラインを構築します。
+動画から文字起こしと分析を行い、構造化されたレポートを生成するPythonプロジェクト。
 
-## システムアーキテクチャ
+## 機能
 
-### 1. 入力層
-- 動画ファイルの入力処理
-- 対応フォーマット: mp4, avi等
-- 入力方法: ファイルアップロードまたはディレクトリ指定
+- 動画からの音声抽出と文字起こし
+- フレーム抽出とOCR処理
+- テキスト分析（要約、キーポイント抽出）
+- HTMLレポート生成
+- Notion連携
 
-### 2. 処理層
-#### 2.1 フレーム抽出モジュール
-- OpenCVを使用した動画フレーム抽出
-- シーン検出アルゴリズムによる重要フレーム選定
-- 動画長に応じた可変枚数抽出(1時間あたり約1000枚)
+## 必要条件
 
-#### 2.2 OCRモジュール
-- Tesseractを使用したテキスト抽出
-- 日本語・英語の多言語対応
-- テキスト品質評価機能
+- Python 3.9以上
+- FFmpeg
+- Tesseract OCR
+- CUDA対応GPUを推奨（文字起こし処理の高速化）
 
-#### 2.3 音声認識モジュール
-- Whisperを使用した高精度音声認識
-- タイムスタンプ付きテキスト生成
-- 日本語に最適化された設定
+## インストール
 
-#### 2.4 テキスト処理モジュール
-- MeCabによる形態素解析
-- キーワード抽出機能
-- トピック分析機能
-- テキスト要約機能
+1. リポジトリのクローン:
+```bash
+git clone https://github.com/yourusername/VideoTranscription.git
+cd VideoTranscription
+```
 
-### 3. 出力層
-- JSON/CSV形式でのデータ出力
-- 統合データ形式:
-  - 動画ID
-  - タイムスタンプ
-  - OCRテキスト
-  - 音声書き起こし
-  - 要約テキスト
-  - キーワード
-  - サムネイル参照
+2. 仮想環境の作成と有効化:
+```bash
+python -m venv venv
+source venv/bin/activate  # Unix
+# または
+.\venv\Scripts\activate  # Windows
+```
 
-## 開発環境
-- Python 3.9
-- 主要依存ライブラリ:
-  - numpy
-  - opencv-python
-  - pytesseract
-  - moviepy
-  - transformers
-  - whisper
-  - mecab-python3
-
-## セットアップ手順
-1. 依存ライブラリのインストール
+3. 依存関係のインストール:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. 設定ファイルの準備
-- config/config.yamlを環境に合わせて設定
-
-3. 実行方法
+4. 環境変数の設定:
 ```bash
-python src/main.py [動画ファイルパス] --output [出力ディレクトリ]
+cp .env.example .env
+# .envファイルを編集して必要なAPIキーを設定
 ```
 
-## 開発ステップ
-1. 要件定義とアーキテクチャ設計 【現在地】
-2. 動画入力およびフレーム抽出機能の実装
-3. OCR処理モジュールの実装
-4. 音声書き起こしとテキスト要約機能の実装
-5. 統合テスト、エラーハンドリング、最終デプロイ
+## 使用方法
+
+1. 基本的な使用方法:
+```python
+from src.video_processor import VideoProcessor
+
+processor = VideoProcessor()
+result = processor.process_video("path/to/video.mp4")
+```
+
+2. カスタム設定での使用:
+```python
+config = {
+    'frame_extractor_config': {
+        'frame_interval': 1,
+        'min_scene_change': 0.3
+    },
+    'ocr_config': {
+        'min_confidence': 0.6
+    },
+    'text_analyzer_config': {
+        'model_name': 'ja_core_news_lg'
+    }
+}
+
+processor = VideoProcessor(config)
+result = processor.process_video("path/to/video.mp4")
+```
+
+## プロジェクト構造
+
+```
+VideoTranscription/
+├── src/
+│   ├── video_processing/
+│   │   ├── frame_extractor.py
+│   │   └── audio_extractor.py
+│   ├── analysis/
+│   │   ├── ocr_processor.py
+│   │   └── text_analyzer.py
+│   └── output/
+│       └── report_generator.py
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   └── test_data/
+├── templates/
+│   └── report_template.html
+├── config/
+│   └── default_config.json
+└── docs/
+    ├── API.md
+    └── DEVELOPMENT.md
+```
+
+## テスト
+
+テストの実行:
+```bash
+pytest tests/
+```
+
+カバレッジレポートの生成:
+```bash
+pytest --cov=src tests/
+```
+
+## 開発
+
+1. 開発環境のセットアップ:
+```bash
+pip install -r requirements-dev.txt
+```
+
+2. コード品質チェック:
+```bash
+black src/ tests/
+flake8 src/ tests/
+mypy src/ tests/
+```
+
+## ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています。詳細は[LICENSE](LICENSE)ファイルを参照してください。
+
+## 貢献
+
+1. このリポジトリをフォーク
+2. 新しいブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'Add amazing feature'`)
+4. ブランチをプッシュ (`git push origin feature/amazing-feature`)
+5. プルリクエストを作成
+
+## 作者
+
+- 作者名
+- メールアドレス
+- プロジェクトURL

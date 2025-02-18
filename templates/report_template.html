@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --info-color: #17a2b8;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+        }
+        
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        
+        .metadata {
+            background-color: var(--light-color);
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        
+        .segment {
+            border: 1px solid #ddd;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        
+        .segment:hover {
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .segment-header {
+            background-color: var(--info-color);
+            color: white;
+            padding: 10px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 5px 5px 0 0;
+        }
+        
+        .key-points {
+            background-color: var(--light-color);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+        
+        .screenshot {
+            max-width: 100%;
+            height: auto;
+            margin: 15px 0;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>{title}</h1>
+        <p>処理日時: {processed_at}</p>
+    </div>
+    
+    <div class="metadata">
+        <h2>動画情報</h2>
+        <p>動画時間: {video_duration}秒</p>
+        <p>セグメント数: {segment_count}</p>
+        <p>スクリーンショット数: {screenshot_count}</p>
+    </div>
+    
+    <div class="segments">
+        {% for segment in segments %}
+        <div class="segment">
+            <div class="segment-header">
+                <h3>{{segment.heading}}</h3>
+                <p>{{segment.start_time}}秒 - {{segment.end_time}}秒</p>
+            </div>
+            
+            <div class="content">
+                <h4>要約</h4>
+                <p>{{segment.summary}}</p>
+                
+                <div class="key-points">
+                    <h4>重要ポイント</h4>
+                    <ul>
+                    {% for point in segment.key_points %}
+                        <li>{{point}}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+                
+                <img class="screenshot" src="{{segment.screenshot}}" alt="スクリーンショット">
+                
+                <details>
+                    <summary>詳細テキスト</summary>
+                    <p>{{segment.text}}</p>
+                </details>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</body>
+</html> 

@@ -23,7 +23,7 @@ def output_dir():
     os.makedirs(output_path, exist_ok=True)
     return output_path
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=False)
 def cleanup_output(output_dir):
     """テスト実行後に出力ファイルをクリーンアップ"""
     yield
@@ -42,7 +42,7 @@ def temp_dir():
     os.makedirs(temp_path, exist_ok=True)
     return temp_path
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=False)
 def cleanup_temp(temp_dir):
     """テスト実行後に一時ファイルをクリーンアップ"""
     yield

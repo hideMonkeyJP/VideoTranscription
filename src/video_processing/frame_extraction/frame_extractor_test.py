@@ -1,8 +1,11 @@
 import unittest
 import os
+from pathlib import Path
 import shutil
 from PIL import Image
-from frame_extractor import FrameExtractor
+import json
+
+from src.video_processing.frame_extraction.frame_extractor import FrameExtractor, FrameExtractionError
 
 class TestFrameExtractor(unittest.TestCase):
     @classmethod

@@ -1,7 +1,8 @@
 import unittest
 import os
 import shutil
-from audio_extractor import AudioExtractor
+from pathlib import Path
+from video_processing.audio_extraction.audio_extractor import AudioExtractor, AudioExtractionError
 
 class TestAudioExtractor(unittest.TestCase):
     @classmethod
@@ -9,7 +10,7 @@ class TestAudioExtractor(unittest.TestCase):
         """テストクラスの前準備"""
         cls.test_dir = os.path.dirname(os.path.abspath(__file__))
         cls.test_output_dir = os.path.join(cls.test_dir, 'test_output')
-        cls.test_video = os.path.join(cls.test_dir, '..', '..', '..', 'videos', 'Sample.mp4')
+        cls.test_video = os.path.join(cls.test_dir, '..', '..', '..', 'videos', 'sample.mp4')
         
         # テスト用の出力ディレクトリを作成
         os.makedirs(cls.test_output_dir, exist_ok=True)
@@ -18,7 +19,8 @@ class TestAudioExtractor(unittest.TestCase):
         """各テストの前準備"""
         self.config = {
             'format': 'wav',
-            'sample_rate': 16000
+            'sample_rate': 16000,
+            'output_dir': self.test_output_dir
         }
         self.extractor = AudioExtractor(config=self.config)
 

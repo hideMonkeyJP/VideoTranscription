@@ -1,0 +1,302 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+	<testsuite name="src.video_processing.audio_extraction.audio_extractor_test.TestAudioExtractor-20250213170701" tests="6" file="src/video_processing/audio_extraction/audio_extractor_test.py" time="0.442" timestamp="2025-02-13T17:07:04" failures="0" errors="0" skipped="0">
+		<testcase classname="src.video_processing.audio_extraction.audio_extractor_test.TestAudioExtractor" name="test_extract_audio" time="0.213" timestamp="2025-02-13T17:07:03" file="src/video_processing/audio_extraction/audio_extractor_test.py" line="32">
+			<!--音声抽出のテスト-->
+		</testcase>
+		<testcase classname="src.video_processing.audio_extraction.audio_extractor_test.TestAudioExtractor" name="test_extract_audio_without_output_path" time="0.092" timestamp="2025-02-13T17:07:03" file="src/video_processing/audio_extraction/audio_extractor_test.py" line="47">
+			<!--出力パスを指定しない場合のテスト-->
+		</testcase>
+		<testcase classname="src.video_processing.audio_extraction.audio_extractor_test.TestAudioExtractor" name="test_get_audio_info_nonexistent" time="0.000" timestamp="2025-02-13T17:07:03" file="src/video_processing/audio_extraction/audio_extractor_test.py" line="77">
+			<!--存在しない音声ファイルの情報取得テスト-->
+		</testcase>
+		<testcase classname="src.video_processing.audio_extraction.audio_extractor_test.TestAudioExtractor" name="test_get_audio_info_wav" time="0.136" timestamp="2025-02-13T17:07:04" file="src/video_processing/audio_extraction/audio_extractor_test.py" line="60">
+			<!--WAVファイルの情報取得テスト-->
+		</testcase>
+		<testcase classname="src.video_processing.audio_extraction.audio_extractor_test.TestAudioExtractor" name="test_init" time="0.000" timestamp="2025-02-13T17:07:04" file="src/video_processing/audio_extraction/audio_extractor_test.py" line="27">
+			<!--初期化のテスト-->
+		</testcase>
+		<testcase classname="src.video_processing.audio_extraction.audio_extractor_test.TestAudioExtractor" name="test_nonexistent_video" time="0.000" timestamp="2025-02-13T17:07:04" file="src/video_processing/audio_extraction/audio_extractor_test.py" line="55">
+			<!--存在しない動画ファイルのテスト-->
+		</testcase>
+	</testsuite>
+	<testsuite name="src.video_processing.frame_extraction.frame_extractor_test.TestFrameExtractor-20250213170701" tests="4" file="src/video_processing/frame_extraction/frame_extractor_test.py" time="2.241" timestamp="2025-02-13T17:07:03" failures="1" errors="3" skipped="0">
+		<testcase classname="src.video_processing.frame_extraction.frame_extractor_test.TestFrameExtractor" name="test_extract_frames" time="1.138" timestamp="2025-02-13T17:07:02" file="src/video_processing/frame_extraction/frame_extractor_test.py" line="34">
+			<!--フレーム抽出のテスト-->
+			<failure type="AssertionError" message="'metadata' not found in {'timestamp': 0.04, 'image': &lt;PIL.Image.Image image mode=RGB size=1280x720 at 0x1603463D0&gt;, 'frame_number': 1, 'actual_position': 0.04, 'scene_change_score': 0.0, 'is_important': False}"><![CDATA[Traceback (most recent call last):
+  File "/Users/takayanagihidenori/Cursor/VideoTranscription/src/video_processing/frame_extraction/frame_extractor_test.py", line 46, in test_extract_frames
+    self.assertIn('metadata', frame)
+AssertionError: 'metadata' not found in {'timestamp': 0.04, 'image': <PIL.Image.Image image mode=RGB size=1280x720 at 0x1603463D0>, 'frame_number': 1, 'actual_position': 0.04, 'scene_change_score': 0.0, 'is_important': False}
+]]></failure>
+			<system-out><![CDATA[Debug: Updating config with: {'interval': 0.5, 'quality': 90}
+Debug: Final configuration: {'frame_interval': 1.0, 'quality': 90, 'target_frames_per_hour': 1000, 'important_frames_ratio': 0.05, 'min_frames': 100, 'max_frames': 5000, 'min_scene_change': 0.3, 'interval': 0.5}
+Debug: Starting frame extraction with interval: 1.0s (frames to skip: 25)
+Debug: Video duration: 53.72s, FPS: 25.0, Total frames: 1343
+Debug: Frame 0, Actual frame: 1, Position: 0.04s
+Debug: Next frame will be: 25
+Debug: Frame 25, Actual frame: 26, Position: 1.04s
+Debug: Next frame will be: 50
+Debug: Frame 50, Actual frame: 51, Position: 2.04s
+Debug: Next frame will be: 75
+Debug: Frame 75, Actual frame: 76, Position: 3.04s
+Debug: Next frame will be: 100
+Debug: Frame 100, Actual frame: 101, Position: 4.04s
+Debug: Next frame will be: 125
+Debug: Frame 125, Actual frame: 126, Position: 5.04s
+Debug: Next frame will be: 150
+Debug: Frame 150, Actual frame: 151, Position: 6.04s
+Debug: Next frame will be: 175
+Debug: Frame 175, Actual frame: 176, Position: 7.04s
+Debug: Next frame will be: 200
+Debug: Frame 200, Actual frame: 201, Position: 8.04s
+Debug: Next frame will be: 225
+Debug: Frame 225, Actual frame: 226, Position: 9.04s
+Debug: Next frame will be: 250
+Debug: Frame 250, Actual frame: 251, Position: 10.04s
+Debug: Next frame will be: 275
+Debug: Frame 275, Actual frame: 276, Position: 11.04s
+Debug: Next frame will be: 300
+Debug: Frame 300, Actual frame: 301, Position: 12.04s
+Debug: Next frame will be: 325
+Debug: Frame 325, Actual frame: 326, Position: 13.04s
+Debug: Next frame will be: 350
+Debug: Frame 350, Actual frame: 351, Position: 14.04s
+Debug: Next frame will be: 375
+Debug: Frame 375, Actual frame: 376, Position: 15.04s
+Debug: Next frame will be: 400
+Debug: Frame 400, Actual frame: 401, Position: 16.04s
+Debug: Next frame will be: 425
+Debug: Frame 425, Actual frame: 426, Position: 17.04s
+Debug: Next frame will be: 450
+Debug: Frame 450, Actual frame: 451, Position: 18.04s
+Debug: Next frame will be: 475
+Debug: Frame 475, Actual frame: 476, Position: 19.04s
+Debug: Next frame will be: 500
+Debug: Frame 500, Actual frame: 501, Position: 20.04s
+Debug: Next frame will be: 525
+Debug: Frame 525, Actual frame: 526, Position: 21.04s
+Debug: Next frame will be: 550
+Debug: Frame 550, Actual frame: 551, Position: 22.04s
+Debug: Next frame will be: 575
+Debug: Frame 575, Actual frame: 576, Position: 23.04s
+Debug: Next frame will be: 600
+Debug: Frame 600, Actual frame: 601, Position: 24.04s
+Debug: Next frame will be: 625
+Debug: Frame 625, Actual frame: 626, Position: 25.04s
+Debug: Next frame will be: 650
+Debug: Frame 650, Actual frame: 651, Position: 26.04s
+Debug: Next frame will be: 675
+Debug: Frame 675, Actual frame: 676, Position: 27.04s
+Debug: Next frame will be: 700
+Debug: Frame 700, Actual frame: 701, Position: 28.04s
+Debug: Next frame will be: 725
+Debug: Frame 725, Actual frame: 726, Position: 29.04s
+Debug: Next frame will be: 750
+Debug: Frame 750, Actual frame: 751, Position: 30.04s
+Debug: Next frame will be: 775
+Debug: Frame 775, Actual frame: 776, Position: 31.04s
+Debug: Next frame will be: 800
+Debug: Frame 800, Actual frame: 801, Position: 32.04s
+Debug: Next frame will be: 825
+Debug: Frame 825, Actual frame: 826, Position: 33.04s
+Debug: Next frame will be: 850
+Debug: Frame 850, Actual frame: 851, Position: 34.04s
+Debug: Next frame will be: 875
+Debug: Frame 875, Actual frame: 876, Position: 35.04s
+Debug: Next frame will be: 900
+Debug: Frame 900, Actual frame: 901, Position: 36.04s
+Debug: Next frame will be: 925
+Debug: Frame 925, Actual frame: 926, Position: 37.04s
+Debug: Next frame will be: 950
+Debug: Frame 950, Actual frame: 951, Position: 38.04s
+Debug: Next frame will be: 975
+Debug: Frame 975, Actual frame: 976, Position: 39.04s
+Debug: Next frame will be: 1000
+Debug: Frame 1000, Actual frame: 1001, Position: 40.04s
+Debug: Next frame will be: 1025
+Debug: Frame 1025, Actual frame: 1026, Position: 41.04s
+Debug: Next frame will be: 1050
+Debug: Frame 1050, Actual frame: 1051, Position: 42.04s
+Debug: Next frame will be: 1075
+Debug: Frame 1075, Actual frame: 1076, Position: 43.04s
+Debug: Next frame will be: 1100
+Debug: Frame 1100, Actual frame: 1101, Position: 44.04s
+Debug: Next frame will be: 1125
+Debug: Frame 1125, Actual frame: 1126, Position: 45.04s
+Debug: Next frame will be: 1150
+Debug: Frame 1150, Actual frame: 1151, Position: 46.04s
+Debug: Next frame will be: 1175
+Debug: Frame 1175, Actual frame: 1176, Position: 47.04s
+Debug: Next frame will be: 1200
+Debug: Frame 1200, Actual frame: 1201, Position: 48.04s
+Debug: Next frame will be: 1225
+Debug: Frame 1225, Actual frame: 1226, Position: 49.04s
+Debug: Next frame will be: 1250
+Debug: Frame 1250, Actual frame: 1251, Position: 50.04s
+Debug: Next frame will be: 1275
+Debug: Frame 1275, Actual frame: 1276, Position: 51.04s
+Debug: Next frame will be: 1300
+Debug: Frame 1300, Actual frame: 1301, Position: 52.04s
+Debug: Next frame will be: 1325
+Debug: Frame 1325, Actual frame: 1326, Position: 53.04s
+Debug: Next frame will be: 1350
+Debug: Extracted 54 frames with interval 1.0s
+]]></system-out>
+		</testcase>
+		<testcase classname="src.video_processing.frame_extraction.frame_extractor_test.TestFrameExtractor" name="test_init" time="0.000" timestamp="2025-02-13T17:07:02" file="src/video_processing/frame_extraction/frame_extractor_test.py" line="29">
+			<!--初期化のテスト-->
+			<error type="AttributeError" message="'FrameExtractor' object has no attribute 'interval'"><![CDATA[Traceback (most recent call last):
+  File "/Users/takayanagihidenori/Cursor/VideoTranscription/src/video_processing/frame_extraction/frame_extractor_test.py", line 31, in test_init
+    self.assertEqual(self.extractor.interval, 0.5)
+AttributeError: 'FrameExtractor' object has no attribute 'interval'
+]]></error>
+			<system-out><![CDATA[Debug: Updating config with: {'interval': 0.5, 'quality': 90}
+Debug: Final configuration: {'frame_interval': 1.0, 'quality': 90, 'target_frames_per_hour': 1000, 'important_frames_ratio': 0.05, 'min_frames': 100, 'max_frames': 5000, 'min_scene_change': 0.3, 'interval': 0.5}
+]]></system-out>
+		</testcase>
+		<testcase classname="src.video_processing.frame_extraction.frame_extractor_test.TestFrameExtractor" name="test_nonexistent_video" time="0.008" timestamp="2025-02-13T17:07:02" file="src/video_processing/frame_extraction/frame_extractor_test.py" line="78">
+			<!--存在しない動画ファイルのテスト-->
+			<error type="FrameExtractionError" message="フレーム抽出中にエラーが発生: 動画ファイルを開けません: nonexistent.mp4"><![CDATA[Traceback (most recent call last):
+  File "/Users/takayanagihidenori/Cursor/VideoTranscription/src/video_processing/frame_extraction/frame_extractor.py", line 85, in extract_frames
+    raise FrameExtractionError(f"動画ファイルを開けません: {video_path}")
+src.video_processing.frame_extraction.frame_extractor.FrameExtractionError: 動画ファイルを開けません: nonexistent.mp4
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/takayanagihidenori/Cursor/VideoTranscription/src/video_processing/frame_extraction/frame_extractor_test.py", line 81, in test_nonexistent_video
+    self.extractor.extract_frames('nonexistent.mp4')
+  File "/Users/takayanagihidenori/Cursor/VideoTranscription/src/video_processing/frame_extraction/frame_extractor.py", line 152, in extract_frames
+    raise FrameExtractionError(f"フレーム抽出中にエラーが発生: {str(e)}")
+src.video_processing.frame_extraction.frame_extractor.FrameExtractionError: フレーム抽出中にエラーが発生: 動画ファイルを開けません: nonexistent.mp4
+]]></error>
+			<system-out><![CDATA[Debug: Updating config with: {'interval': 0.5, 'quality': 90}
+Debug: Final configuration: {'frame_interval': 1.0, 'quality': 90, 'target_frames_per_hour': 1000, 'important_frames_ratio': 0.05, 'min_frames': 100, 'max_frames': 5000, 'min_scene_change': 0.3, 'interval': 0.5}
+]]></system-out>
+		</testcase>
+		<testcase classname="src.video_processing.frame_extraction.frame_extractor_test.TestFrameExtractor" name="test_save_frames" time="1.095" timestamp="2025-02-13T17:07:03" file="src/video_processing/frame_extraction/frame_extractor_test.py" line="64">
+			<!--フレーム保存のテスト-->
+			<error type="AttributeError" message="'FrameExtractor' object has no attribute 'quality'"><![CDATA[Traceback (most recent call last):
+  File "/Users/takayanagihidenori/Cursor/VideoTranscription/src/video_processing/frame_extraction/frame_extractor_test.py", line 70, in test_save_frames
+    saved_paths = self.extractor.save_frames(frames, self.test_output_dir)
+  File "/Users/takayanagihidenori/Cursor/VideoTranscription/src/video_processing/frame_extraction/frame_extractor.py", line 193, in save_frames
+    frame['image'].save(image_path, 'JPEG', quality=self.quality)
+AttributeError: 'FrameExtractor' object has no attribute 'quality'
+]]></error>
+			<system-out><![CDATA[Debug: Updating config with: {'interval': 0.5, 'quality': 90}
+Debug: Final configuration: {'frame_interval': 1.0, 'quality': 90, 'target_frames_per_hour': 1000, 'important_frames_ratio': 0.05, 'min_frames': 100, 'max_frames': 5000, 'min_scene_change': 0.3, 'interval': 0.5}
+Debug: Starting frame extraction with interval: 1.0s (frames to skip: 25)
+Debug: Video duration: 53.72s, FPS: 25.0, Total frames: 1343
+Debug: Frame 0, Actual frame: 1, Position: 0.04s
+Debug: Next frame will be: 25
+Debug: Frame 25, Actual frame: 26, Position: 1.04s
+Debug: Next frame will be: 50
+Debug: Frame 50, Actual frame: 51, Position: 2.04s
+Debug: Next frame will be: 75
+Debug: Frame 75, Actual frame: 76, Position: 3.04s
+Debug: Next frame will be: 100
+Debug: Frame 100, Actual frame: 101, Position: 4.04s
+Debug: Next frame will be: 125
+Debug: Frame 125, Actual frame: 126, Position: 5.04s
+Debug: Next frame will be: 150
+Debug: Frame 150, Actual frame: 151, Position: 6.04s
+Debug: Next frame will be: 175
+Debug: Frame 175, Actual frame: 176, Position: 7.04s
+Debug: Next frame will be: 200
+Debug: Frame 200, Actual frame: 201, Position: 8.04s
+Debug: Next frame will be: 225
+Debug: Frame 225, Actual frame: 226, Position: 9.04s
+Debug: Next frame will be: 250
+Debug: Frame 250, Actual frame: 251, Position: 10.04s
+Debug: Next frame will be: 275
+Debug: Frame 275, Actual frame: 276, Position: 11.04s
+Debug: Next frame will be: 300
+Debug: Frame 300, Actual frame: 301, Position: 12.04s
+Debug: Next frame will be: 325
+Debug: Frame 325, Actual frame: 326, Position: 13.04s
+Debug: Next frame will be: 350
+Debug: Frame 350, Actual frame: 351, Position: 14.04s
+Debug: Next frame will be: 375
+Debug: Frame 375, Actual frame: 376, Position: 15.04s
+Debug: Next frame will be: 400
+Debug: Frame 400, Actual frame: 401, Position: 16.04s
+Debug: Next frame will be: 425
+Debug: Frame 425, Actual frame: 426, Position: 17.04s
+Debug: Next frame will be: 450
+Debug: Frame 450, Actual frame: 451, Position: 18.04s
+Debug: Next frame will be: 475
+Debug: Frame 475, Actual frame: 476, Position: 19.04s
+Debug: Next frame will be: 500
+Debug: Frame 500, Actual frame: 501, Position: 20.04s
+Debug: Next frame will be: 525
+Debug: Frame 525, Actual frame: 526, Position: 21.04s
+Debug: Next frame will be: 550
+Debug: Frame 550, Actual frame: 551, Position: 22.04s
+Debug: Next frame will be: 575
+Debug: Frame 575, Actual frame: 576, Position: 23.04s
+Debug: Next frame will be: 600
+Debug: Frame 600, Actual frame: 601, Position: 24.04s
+Debug: Next frame will be: 625
+Debug: Frame 625, Actual frame: 626, Position: 25.04s
+Debug: Next frame will be: 650
+Debug: Frame 650, Actual frame: 651, Position: 26.04s
+Debug: Next frame will be: 675
+Debug: Frame 675, Actual frame: 676, Position: 27.04s
+Debug: Next frame will be: 700
+Debug: Frame 700, Actual frame: 701, Position: 28.04s
+Debug: Next frame will be: 725
+Debug: Frame 725, Actual frame: 726, Position: 29.04s
+Debug: Next frame will be: 750
+Debug: Frame 750, Actual frame: 751, Position: 30.04s
+Debug: Next frame will be: 775
+Debug: Frame 775, Actual frame: 776, Position: 31.04s
+Debug: Next frame will be: 800
+Debug: Frame 800, Actual frame: 801, Position: 32.04s
+Debug: Next frame will be: 825
+Debug: Frame 825, Actual frame: 826, Position: 33.04s
+Debug: Next frame will be: 850
+Debug: Frame 850, Actual frame: 851, Position: 34.04s
+Debug: Next frame will be: 875
+Debug: Frame 875, Actual frame: 876, Position: 35.04s
+Debug: Next frame will be: 900
+Debug: Frame 900, Actual frame: 901, Position: 36.04s
+Debug: Next frame will be: 925
+Debug: Frame 925, Actual frame: 926, Position: 37.04s
+Debug: Next frame will be: 950
+Debug: Frame 950, Actual frame: 951, Position: 38.04s
+Debug: Next frame will be: 975
+Debug: Frame 975, Actual frame: 976, Position: 39.04s
+Debug: Next frame will be: 1000
+Debug: Frame 1000, Actual frame: 1001, Position: 40.04s
+Debug: Next frame will be: 1025
+Debug: Frame 1025, Actual frame: 1026, Position: 41.04s
+Debug: Next frame will be: 1050
+Debug: Frame 1050, Actual frame: 1051, Position: 42.04s
+Debug: Next frame will be: 1075
+Debug: Frame 1075, Actual frame: 1076, Position: 43.04s
+Debug: Next frame will be: 1100
+Debug: Frame 1100, Actual frame: 1101, Position: 44.04s
+Debug: Next frame will be: 1125
+Debug: Frame 1125, Actual frame: 1126, Position: 45.04s
+Debug: Next frame will be: 1150
+Debug: Frame 1150, Actual frame: 1151, Position: 46.04s
+Debug: Next frame will be: 1175
+Debug: Frame 1175, Actual frame: 1176, Position: 47.04s
+Debug: Next frame will be: 1200
+Debug: Frame 1200, Actual frame: 1201, Position: 48.04s
+Debug: Next frame will be: 1225
+Debug: Frame 1225, Actual frame: 1226, Position: 49.04s
+Debug: Next frame will be: 1250
+Debug: Frame 1250, Actual frame: 1251, Position: 50.04s
+Debug: Next frame will be: 1275
+Debug: Frame 1275, Actual frame: 1276, Position: 51.04s
+Debug: Next frame will be: 1300
+Debug: Frame 1300, Actual frame: 1301, Position: 52.04s
+Debug: Next frame will be: 1325
+Debug: Frame 1325, Actual frame: 1326, Position: 53.04s
+Debug: Next frame will be: 1350
+Debug: Extracted 54 frames with interval 1.0s
+]]></system-out>
+		</testcase>
+	</testsuite>
+</testsuites>

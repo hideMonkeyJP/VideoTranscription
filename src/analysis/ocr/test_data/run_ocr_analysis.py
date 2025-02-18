@@ -6,18 +6,19 @@ from PIL import Image
 import cv2
 
 # OCRProcessorをインポートできるようにパスを追加
-sys.path.append(str(Path(__file__).parent.parent.parent.parent))
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.append(str(project_root))
 
-from analysis.ocr import OCRProcessor
-from video_processing.frame_extraction import FrameExtractor
+from src.analysis.ocr import OCRProcessor
+from src.video_processing.frame_extraction import FrameExtractor
 
 def main():
     """動画からフレームを抽出してOCR処理を実行"""
-    # 動画ファイルのパス
-    video_path = "/Users/takayanagihidenori/Cursor/VideoTranscription/videos/Sample.mp4"
+    # 入力ディレクトリのパス
+    input_dir = "/Users/takayanagihidenori/Cursor/VideoTranscription/output_test/notion_test/screenshots_20250209_160200"
     
-    if not os.path.exists(video_path):
-        print(f"エラー: 動画ファイルが見つかりません: {video_path}")
+    if not os.path.exists(input_dir):
+        print(f"エラー: 入力ディレクトリが見つかりません: {input_dir}")
         return
         
     # 出力ディレクトリの作成
@@ -25,17 +26,21 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     
     try:
-        print("フレーム抽出を開始...")
-        # フレーム抽出の設定
-        frame_config = {
-            'interval': 1.0,  # 1秒間隔
-            'quality': 95
-        }
-        frame_extractor = FrameExtractor(frame_config)
-        
-        # フレームの抽出
-        frames = frame_extractor.extract_frames(video_path)
-        print(f"抽出されたフレーム数: {len(frames)}")
+        print("画像の読み込みを開始...")
+        # 画像ファイルの読み込み
+        frames = []
+        for file in sorted(os.listdir(input_dir)):
+            if file.endswith('.png'):
+                image_path = os.path.join(input_dir, file)
+                image = Image.open(image_path)
+                frame_number = int(file.split('_')[1].split('.')[0])
+                frames.append({
+                    'image': image,
+                    'frame_number': frame_number,
+                    'timestamp': frame_number * 0.52,  # 0.52秒間隔
+                    'importance_score': 1.0  # デフォルトスコア
+                })
+        print(f"読み込まれた画像数: {len(frames)}")
         
         # OCRプロセッサーの設定
         ocr_config = {
@@ -52,10 +57,10 @@ def main():
         
         # 結果の表示と保存
         print("\n=== OCR処理結果 ===")
-        for result in results:
-            frame_number = result.get('frame_number', 'unknown')
-            timestamp = result.get('timestamp', 0.0)
-            texts = result.get('texts', [])
+        for screenshot in results['screenshots']:
+            frame_number = screenshot.get('frame_number', 'unknown')
+            timestamp = screenshot.get('timestamp', 0.0)
+            texts = screenshot.get('texts', [])
             
             if texts:
                 print(f"\nフレーム {frame_number} (タイムスタンプ: {timestamp:.1f}秒):")
@@ -69,17 +74,6 @@ def main():
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
         print(f"\n詳細な結果をJSONファイルとして保存しました: {output_file}")
-        
-        # フレーム画像も保存
-        frames_dir = output_dir / "frames"
-        frames_dir.mkdir(exist_ok=True)
-        
-        print("\nフレーム画像を保存中...")
-        for i, frame in enumerate(frames):
-            image_path = frames_dir / f"frame_{i:03d}.jpg"
-            frame['image'].save(image_path, 'JPEG', quality=95)
-            
-        print(f"フレーム画像を保存しました: {frames_dir}")
             
     except Exception as e:
         print(f"エラーが発生しました: {str(e)}")

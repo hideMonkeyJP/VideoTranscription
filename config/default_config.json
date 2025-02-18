@@ -1,0 +1,62 @@
+{
+    "video_processor": {
+        "output_dir": "output",
+        "temp_dir": "temp",
+        "log_dir": "logs"
+    },
+    "frame_extractor": {
+        "output_dir": "output/frames",
+        "frame_interval": 1,
+        "min_scene_change": 0.3,
+        "target_frames_per_hour": 1000,
+        "important_frames_ratio": 0.05,
+        "min_frames": 100,
+        "max_frames": 5000,
+        "quality": {
+            "jpeg_quality": 90,
+            "min_size": 100
+        }
+    },
+    "audio_extractor": {
+        "output_dir": "output/audio",
+        "model_name": "medium",
+        "language": "ja",
+        "audio_settings": {
+            "sample_rate": 16000,
+            "channels": 1,
+            "format": "wav"
+        }
+    },
+    "ocr_processor": {
+        "min_confidence": 0.6,
+        "language": "jpn",
+        "preprocessing": {
+            "denoise": true,
+            "contrast": 1.5,
+            "threshold": 127
+        }
+    },
+    "text_analyzer": {
+        "model_name": "ja_core_news_lg",
+        "min_segment_length": 50,
+        "similarity_threshold": 0.3,
+        "max_keywords": 10,
+        "max_key_points": 3
+    },
+    "report_generator": {
+        "template_dir": "templates",
+        "template_name": "report_template.html",
+        "language": "ja"
+    },
+    "performance": {
+        "batch_size": 10,
+        "max_workers": 4,
+        "use_gpu": true,
+        "memory_limit": "4G"
+    },
+    "logging": {
+        "level": "INFO",
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "file": "video_processing.log"
+    }
+} 

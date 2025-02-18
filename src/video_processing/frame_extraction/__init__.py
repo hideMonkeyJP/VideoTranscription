@@ -9,6 +9,6 @@
 - メタデータの管理
 """
 
-from .frame_extractor import FrameExtractor
+from .frame_extractor import FrameExtractor, FrameExtractionError
 
-__all__ = ['FrameExtractor']
+__all__ = ['FrameExtractor', 'FrameExtractionError']

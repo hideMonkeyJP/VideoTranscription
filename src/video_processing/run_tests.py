@@ -4,8 +4,8 @@ import os
 import datetime
 from unittest.runner import TextTestRunner
 from unittest.loader import TestLoader
-from frame_extraction.frame_extractor_test import TestFrameExtractor
-from audio_extraction.audio_extractor_test import TestAudioExtractor
+from src.video_processing.frame_extraction.frame_extractor_test import TestFrameExtractor
+from src.video_processing.audio_extraction.audio_extractor_test import TestAudioExtractor
 import xmlrunner
 import HtmlTestRunner
 
