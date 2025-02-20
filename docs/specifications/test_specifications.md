@@ -180,7 +180,30 @@ def test_notion_sync():
     """
 ```
 
-### 3.9 レポート生成テスト
+### 3.9 Supabase登録テスト
+#### test_supabase_registration
+```python
+def test_supabase_registration():
+    """Supabase登録機能の検証
+    
+    検証内容:
+    1. regist.jsonの形式検証
+    2. 必須フィールドの確認
+    3. データ型の検証
+    4. Supabaseへの登録実行
+    
+    実行結果:
+    - 実行時間: 約2.5秒
+    - キャッシュ: 無効
+    - 成功: ✓
+    
+    注意点:
+    - Supabase接続情報の設定が必要
+    - regist.jsonの形式が重要
+    """
+```
+
+### 3.10 レポート生成テスト
 #### test_report_generation
 ```python
 def test_report_generation():

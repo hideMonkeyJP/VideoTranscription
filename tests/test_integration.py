@@ -444,6 +444,55 @@ class TestVideoProcessing:
             pytest.fail(f"Notion同期テストでエラーが発生: {str(e)}")
 
     @pytest.mark.order(9)
+    def test_supabase_registration(self, video_processing_result):
+        """Supabase登録機能のテスト"""
+        try:
+            # regist.jsonの存在確認
+            regist_json_path = video_processing_result['output_files']['notion_data']
+            assert os.path.exists(regist_json_path), "regist.jsonファイルが存在しません"
+
+            print("\nregist.jsonの内容を検証します...")
+            # regist.jsonの内容検証
+            with open(regist_json_path, 'r', encoding='utf-8') as f:
+                regist_data = json.load(f)
+                assert isinstance(regist_data, list), "データがリスト形式ではありません"
+                assert len(regist_data) > 0, "データが空です"
+
+                # 各エントリの検証
+                required_keys = ['No', 'Summary', 'Timestamp', 'Thumbnail']
+                for entry in regist_data:
+                    assert all(key in entry for key in required_keys), f"必須キーが不足しています: {required_keys}"
+                    assert isinstance(entry['No'], int), "Noが整数ではありません"
+                    assert isinstance(entry['Summary'], str), "Summaryが文字列ではありません"
+                    assert isinstance(entry['Timestamp'], str), "Timestampが文字列ではありません"
+                    assert isinstance(entry['Thumbnail'], str), "Thumbnailが文字列ではありません"
+
+            print("\nSupabaseへの登録を開始します...")
+            # Supabase登録の実行
+            from src.tools.supabase_register import register_to_supabase
+            video_path = "videos/Sample.mp4"
+            
+            print("\nvideoテーブルへの登録を実行します...")
+            success = register_to_supabase(
+                regist_json_path,
+                'videos',
+                title="Sample Video",
+                file_path=video_path,
+                duration=300  # サンプル動画の長さ（秒）
+            )
+            
+            if not success:
+                print("\nSupabaseへの登録に失敗しました。エラーログを確認してください。")
+                pytest.fail("Supabaseへの登録に失敗しました")
+            
+            print("\nSupabase登録テストが成功しました!")
+            return True
+
+        except Exception as e:
+            print(f"\nエラーの詳細: {str(e)}")
+            pytest.fail(f"Supabase登録テストでエラーが発生: {str(e)}")
+
+    @pytest.mark.order(10)
     def test_report_generation(self, video_processing_result):
         """レポート生成機能のテスト"""
         try:

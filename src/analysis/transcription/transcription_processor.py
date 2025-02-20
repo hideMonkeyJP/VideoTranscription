@@ -5,6 +5,7 @@ import numpy as np
 import logging
 from pathlib import Path
 import re
+import torch
 
 class TranscriptionError(Exception):
     """音声認識処理に関するエラー"""
@@ -22,6 +23,7 @@ class TranscriptionProcessor:
                 - model_name (str): Whisperモデル名（デフォルト: "base"）
                 - language (str): 言語（デフォルト: "ja"）
                 - auto_optimize (bool): 自動最適化を有効にするかどうか
+                - device (str): 使用するデバイス（"cuda"または"cpu"または"mps"）
         """
         self.config = config or {}
         self.logger = logging.getLogger(__name__)
@@ -31,11 +33,44 @@ class TranscriptionProcessor:
         self.language = self.config.get('language', 'ja')
         self.auto_optimize = self.config.get('auto_optimize', True)
         
+        # デバイスの自動選択
+        self.device = self._select_optimal_device()
+        self.logger.info(f"選択されたデバイス: {self.device}")
+        
         try:
-            self.model = whisper.load_model(self.model_name)
-            self.logger.info(f"Whisperモデルを読み込みました: {self.model_name}")
+            self.model = whisper.load_model(self.model_name, device=self.device)
+            self.logger.info(f"Whisperモデルを読み込みました: {self.model_name} (device: {self.device})")
         except Exception as e:
             raise TranscriptionError(f"モデルの読み込みに失敗: {str(e)}")
+        
+    def _select_optimal_device(self) -> str:
+        """
+        利用可能な最適なデバイスを選択します。
+        
+        Returns:
+            str: 選択されたデバイス ("cuda", "mps", "cpu")
+        """
+        # 設定で指定されている場合はそれを使用
+        if 'device' in self.config:
+            return self.config['device']
+            
+        try:
+            # NVIDIA GPU (CUDA)の確認
+            if torch.cuda.is_available():
+                self.logger.info("CUDA対応GPUが利用可能です")
+                return "cuda"
+                
+            # Apple Silicon (MPS)の確認
+            if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                self.logger.info("Apple Silicon GPUが利用可能です")
+                return "mps"
+                
+        except Exception as e:
+            self.logger.warning(f"GPUの確認中にエラーが発生: {str(e)}")
+            
+        # GPUが利用できない場合はCPUを使用
+        self.logger.info("CPUを使用します")
+        return "cpu"
         
     def transcribe_audio(self, audio_path: str) -> List[Dict[str, Any]]:
         """音声ファイルを文字起こしします"""
