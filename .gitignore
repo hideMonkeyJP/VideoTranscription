@@ -35,6 +35,7 @@ env/
 # Project specific
 temp/
 output/
+output_*/
 output_test/
 output2/
 logs/
