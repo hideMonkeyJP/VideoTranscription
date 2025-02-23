@@ -196,42 +196,58 @@ def text_analysis_result(request, processor_config, ocr_processing_result, audio
     
     return result
 
+@pytest.fixture(scope="class")
+def processor_config():
+    """テスト用の設定を読み込み"""
+    config = Config('config/config.yaml')
+    
+    # テスト固有の設定をオーバーライド（必要な場合のみ）
+    test_specific = {
+        'video_processor': {
+            'output_dir': 'output_test',
+            'temp_dir': 'output_test/temp'
+        },
+        'notion': {
+            'enabled': False  # Notion同期を無効化
+        },
+        'frame_extractor': {
+            'frame_interval': 1.0,
+            'quality': 95,
+            'target_frames_per_hour': 1000,
+            'important_frames_ratio': 0.05,
+            'min_frames': 100,
+            'max_frames': 5000,
+            'min_scene_change': 0.3
+        }
+    }
+    
+    base_config = config.get_all()
+    base_config.update(test_specific)
+    
+    return base_config
+
 class TestVideoProcessing:
     """動画処理の統合テスト"""
 
     @pytest.fixture(scope="class")
     def processor_config(self):
-        """テスト用の設定"""
+        """テスト用の設定を返す"""
         return {
             'video_processor': {
-                'output_dir': 'output',
-                'temp_dir': 'output/temp'
-            },
-            'frame_extractor': {
-                'interval': 0.52,
-                'quality': 95,
-                'frames_per_hour': 6923,
-                'important_frames_ratio': 0.05,
-                'min_scene_change': 0.3
-            },
-            'audio_extractor': {
-                'format': 'wav',
-                'sample_rate': 44100
-            },
-            'transcription': {
-                'model': 'whisper-1',
-                'language': 'ja'
-            },
-            'ocr_processor': {
-                'engine': 'claude',
-                'confidence_threshold': 0.7
-            },
-            'text_analyzer': {
-                'model': 'gemini-pro',
-                'max_tokens': 1000
+                'output_dir': 'output_test',
+                'temp_dir': 'output_test/temp'
             },
             'notion': {
-                'enabled': False
+                'enabled': False  # Notion同期を無効化
+            },
+            'frame_extractor': {
+                'frame_interval': 1.0,
+                'quality': 95,
+                'target_frames_per_hour': 1000,
+                'important_frames_ratio': 0.05,
+                'min_frames': 100,
+                'max_frames': 5000,
+                'min_scene_change': 0.3
             }
         }
 

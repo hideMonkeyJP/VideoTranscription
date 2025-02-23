@@ -13,7 +13,8 @@
 3. 音声抽出と文字起こし
 4. テキスト分析
 5. 結果の統合
-6. Supabase登録用データ生成
+6. レポート生成
+7. Notion登録用データ生成
 
 ## 3. 各ステップの詳細
 
@@ -93,7 +94,7 @@ graph TD
   - キーポイント抽出
   - メタデータ生成
 
-### 3.5 Supabase登録用データ生成
+### 3.5 Notion登録用データ生成
 
 ```mermaid
 graph TD
@@ -127,6 +128,7 @@ output/
 ├── audio/
 │   └── extracted_audio.wav
 ├── regist.json
+├── report.html
 └── final_result.json
 ```
 

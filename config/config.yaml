@@ -11,7 +11,6 @@ output:
 
 # モデル設定
 models:
-  whisper_model: "large-v3"
   tesseract_path: "/opt/homebrew/bin/tesseract"
   gemini:
     model_name: "gemini-pro"
@@ -101,3 +100,87 @@ notion:
 logging:
   level: "INFO"
   max_files: 7
+
+# Whisperモデル設定
+whisper:
+  model:
+    name: "medium"  # mediumモデルを使用（models.whisper_modelと統一）
+    device: "auto"  # デバイスは自動選択
+  options:
+    language: "ja"
+    task: "transcribe"
+    beam_size: 5
+    best_of: 5
+    temperature: 0.0
+
+# 音声認識パラメータ
+transcription:
+  # ビーム探索のパラメータ
+  beam_size: 5        # ビームサーチの幅（大きいほど精度が上がるが遅くなる）
+  best_of: 3          # 生成する候補の数
+  patience: 1.0       # ビーム探索の打ち切り係数
+  length_penalty: 1.0 # 文の長さに対するペナルティ（1.0で中立）
+
+  # 生成制御
+  condition_on_previous_text: true  # 前のテキストを考慮して生成
+  suppress_tokens: [-1]            # 抑制するトークンのリスト
+  without_timestamps: false        # タイムスタンプの生成有無
+  temperature: 0.0                 # 生成のランダム性（0.0で決定的）
+
+# 日本語特有の設定
+japanese:
+  # フィラー（間投詞）のリスト - 必要に応じて除去/保持
+  fillers:
+    - "えーと"
+    - "えっと"
+    - "あのー"
+    - "あの"
+    - "まぁ"
+    - "まあ"
+    - "うーん"
+    - "んー"
+    - "そのー"
+    - "その"
+    - "なんか"
+
+  # 数字の正規化マッピング
+  number_mapping:
+    "一": "1"
+    "二": "2"
+    "三": "3"
+    "四": "4"
+    "五": "5"
+    "六": "6"
+    "七": "7"
+    "八": "8"
+    "九": "9"
+    "〇": "0"
+    "零": "0"
+
+  # 初期プロンプト - 文字起こしの品質向上のためのコンテキスト
+  initial_prompt: |
+    以下は日本語の会話の文字起こしです。
+    自然な話し言葉で、句読点を適切に含みます。
+
+# リソース使用量の目安
+resource_requirements:
+  tiny:
+    gpu_memory: "1GB未満"
+    processing_speed: "非常に高速"
+    accuracy: "基本的な認識"
+  base:
+    gpu_memory: "1GB程度"
+    processing_speed: "高速"
+    accuracy: "一般的な認識"
+  small:
+    gpu_memory: "2GB程度"
+    processing_speed: "中速"
+    accuracy: "良好な認識"
+  medium:
+    gpu_memory: "4GB程度"
+    processing_speed: "やや遅い"
+    accuracy: "高精度な認識"
+  large:
+    gpu_memory: "8GB以上"
+    processing_speed: "遅い"
+    accuracy: "最高精度の認識"
