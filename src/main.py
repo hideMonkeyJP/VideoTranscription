@@ -2,25 +2,17 @@ import os
 import sys
 import argparse
 import logging
+import shutil
 import json
 from pathlib import Path
-from typing import Dict, Any, List
-import time
+import cv2
+from PIL import Image
 
-from video_processor import VideoProcessor
-from utils.config import Config
-from utils.exceptions import VideoProcessorError, ConfigurationError
+# プロジェクトルートをPYTHONPATHに追加
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
-# 中間ファイルのパス定義
-PATHS = {
-    'frames': Path('temp/frames.json'),
-    'ocr': Path('temp/ocr_results.json'),
-    'transcription': Path('temp/transcription.json'),
-    'screenshots': Path('screenshots'),
-    'audio': Path('audio'),
-    'analysis': Path('temp/analysis.json'),
-    'notion_data': Path('regist.json')
-}
+from src.video_processor import VideoProcessor
 
 def setup_logging(output_dir: Path) -> logging.Logger:
     """ロギングの設定を行います"""
@@ -38,58 +30,104 @@ def setup_logging(output_dir: Path) -> logging.Logger:
     )
     return logging.getLogger(__name__)
 
-def validate_json_file(path: Path, required_keys: List[str]) -> bool:
-    """JSONファイルの妥当性確認"""
+def check_output_directory(output_dir: Path, force: bool, logger: logging.Logger) -> None:
+    """出力ディレクトリの状態をチェックします"""
+    if output_dir.exists() and force:
+        logger.info(f"出力ディレクトリをクリーンアップします: {output_dir}")
+        shutil.rmtree(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+def get_video_duration(video_path: str) -> int:
+    """動画の長さ（秒）を取得します"""
     try:
-        if not path.exists():
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            raise Exception("動画ファイルを開けません")
+        
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        duration = int(frame_count / fps)
+        
+        cap.release()
+        return duration
+    except Exception as e:
+        raise Exception(f"動画の長さの取得に失敗: {e}")
+
+def save_regist_data(analysis_result: dict, output_dir: Path, logger: logging.Logger) -> None:
+    """Notion/Supabase登録用のデータを生成して保存します"""
+    try:
+        # analysis.jsonを一時的に保存
+        analysis_json = output_dir / 'analysis.json'
+        with open(analysis_json, 'w', encoding='utf-8') as f:
+            json.dump(analysis_result, f, ensure_ascii=False, indent=2)
+
+        # VideoProcessorを使用してNotion登録用データを生成
+        config = {
+            'video_processor': {
+                'output_dir': str(output_dir),
+                'temp_dir': str(output_dir / 'temp')
+            }
+        }
+        processor = VideoProcessor(config=config)
+        
+        regist_json = output_dir / 'regist.json'
+        success = processor.generate_notion_data(str(analysis_json), str(regist_json))
+        
+        if success:
+            logger.info(f"Notion/Supabase登録用データを保存しました: {regist_json}")
+        else:
+            logger.error("Notion/Supabase登録用データの生成に失敗しました")
+            raise Exception("データ生成に失敗")
+            
+    except Exception as e:
+        logger.error(f"Notion/Supabase登録用データの保存に失敗: {e}")
+        raise
+
+def register_to_supabase(video_path: Path, output_dir: Path, logger: logging.Logger) -> bool:
+    """Supabaseにデータを登録します"""
+    try:
+        from src.tools.supabase_register import register_to_supabase as supabase_register
+        
+        regist_json = output_dir / 'regist.json'
+        if not regist_json.exists():
+            logger.error("regist.jsonが見つかりません")
             return False
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            if isinstance(data, list):
-                return all(all(key in item for key in required_keys) for item in data if item)
-            return all(key in data for key in required_keys)
-    except Exception:
+
+        # 動画の長さを取得
+        try:
+            duration = get_video_duration(str(video_path))
+            logger.info(f"動画の長さ: {duration}秒")
+        except Exception as e:
+            logger.error(f"動画の長さの取得に失敗: {e}")
+            return False
+
+        # Supabaseに登録
+        success = supabase_register(
+            str(regist_json),
+            'videos',
+            title=video_path.stem,
+            file_path=str(video_path),
+            duration=duration
+        )
+        
+        if success:
+            logger.info("Supabaseへの登録が完了しました")
+        else:
+            logger.error("Supabaseへの登録に失敗しました")
+        
+        return success
+    except Exception as e:
+        logger.error(f"Supabase登録中にエラーが発生: {e}")
         return False
 
-def ensure_dir(path: Path) -> Path:
-    """ディレクトリの存在確認と作成"""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return path
-
-def check_intermediate_files(output_dir: Path, logger: logging.Logger) -> Dict[str, bool]:
-    """中間ファイルの存在と有効性を確認"""
-    status = {}
-    required_keys = {
-        'frames': ['timestamp', 'frame_number', 'scene_change_score', 'path'],
-        'ocr': ['screenshots'],
-        'transcription': ['text', 'start', 'end'],
-        'analysis': ['segments', 'total_segments']
-    }
-    
-    for key, path in PATHS.items():
-        full_path = output_dir / path
-        if key in required_keys:
-            status[key] = validate_json_file(full_path, required_keys[key])
-            logger.info(f"中間ファイル {key}: {'有効' if status[key] else '無効または未存在'}")
-        else:
-            status[key] = full_path.exists()
-            logger.info(f"ディレクトリ {key}: {'存在' if status[key] else '未存在'}")
-    
-    return status
-
 def main():
-    start_time = time.time()
-    
-    # コマンドライン引数の解析
     parser = argparse.ArgumentParser(description='動画から文字起こしと要約を生成します')
     parser.add_argument('video_path', help='処理する動画ファイルのパス')
-    parser.add_argument('--output', '-o', default='output', help='出力ディレクトリ')
-    parser.add_argument('--config', '-c', default='config/config.yaml', help='設定ファイルのパス')
-    parser.add_argument('--force', '-f', action='store_true', help='中間ファイルを再生成')
+    parser.add_argument('--output', '-o', default='output_test', help='出力ディレクトリ')
+    parser.add_argument('--force', '-f', action='store_true', help='既存のファイルを上書きする')
     args = parser.parse_args()
 
     try:
-        # 出力ディレクトリの設定
         output_dir = Path(args.output)
         logger = setup_logging(output_dir)
         logger.info(f"処理を開始します - 出力ディレクトリ: {output_dir}")
@@ -99,80 +137,123 @@ def main():
         if not video_path.exists():
             logger.error(f"エラー: 指定された動画ファイル '{video_path}' が見つかりません。")
             sys.exit(1)
-        
-        # 設定ファイルの検証
-        config_path = Path(args.config)
-        if not config_path.exists():
-            logger.error(f"エラー: 設定ファイル '{config_path}' が見つかりません。")
-            sys.exit(1)
 
-        # 出力ディレクトリの作成
-        for path in PATHS.values():
-            ensure_dir(output_dir / path)
-        logger.info("出力ディレクトリを作成しました")
-
-        # 中間ファイルの確認
-        if not args.force:
-            file_status = check_intermediate_files(output_dir, logger)
-            logger.info("中間ファイルの確認が完了しました")
-        else:
-            logger.info("--force オプションが指定されたため、中間ファイルを再生成します")
-            file_status = {k: False for k in PATHS.keys()}
-
-        # 設定の読み込みと更新
-        config = Config(args.config)
-        config_data = config.get_all()
-        config_data.update({
-            'video_processor': {
-                'output_dir': str(output_dir),
-                'temp_dir': str(output_dir / 'temp'),
-                'reuse_intermediate_files': not args.force
-            }
-        })
+        # 出力ディレクトリの準備
+        check_output_directory(output_dir, args.force, logger)
 
         # VideoProcessorの初期化
-        logger.info("VideoProcessorを初期化します...")
-        processor = VideoProcessor(config=config_data)
+        config = {
+            'video_processor': {
+                'output_dir': str(output_dir),
+                'temp_dir': str(output_dir / 'temp')
+            }
+        }
+        processor = VideoProcessor(config=config)
 
-        # 動画の処理
-        logger.info(f"動画の処理を開始します: {video_path}")
-        result = processor.process_video(str(video_path), str(output_dir))
+        # 必要なディレクトリの作成
+        temp_dir = output_dir / 'temp'
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        screenshots_dir = output_dir / 'screenshots'
+        screenshots_dir.mkdir(parents=True, exist_ok=True)
+        audio_dir = output_dir / 'audio'
+        audio_dir.mkdir(parents=True, exist_ok=True)
 
-        # 処理結果の出力
-        logger.info("\n処理が完了しました")
-        logger.info("\n出力ファイル:")
-        for key, path in result['output_files'].items():
-            logger.info(f"- {key}: {path}")
+        # ステップ1: フレーム抽出
+        logger.info("フレーム抽出を開始します...")
+        frames = processor.frame_extractor.extract_frames(str(video_path))
+        saved_paths = processor.frame_extractor.save_frames(frames, str(screenshots_dir))
+        
+        # フレームデータをJSONファイルに保存
+        frames_data = []
+        for frame, path in zip(frames, saved_paths):
+            frames_data.append({
+                'timestamp': frame.get('timestamp', 0),
+                'frame_number': frame.get('frame_number', 0),
+                'scene_change_score': frame.get('scene_change_score', 0),
+                'path': str(path) if isinstance(path, Path) else path
+            })
+        
+        frames_json = temp_dir / 'frames.json'
+        with open(frames_json, 'w', encoding='utf-8') as f:
+            json.dump(frames_data, f, ensure_ascii=False, indent=2)
+        logger.info(f"フレーム抽出が完了しました: {len(frames_data)}フレーム")
 
-        # パフォーマンス情報の出力
-        end_time = time.time()
-        duration = end_time - start_time
-        logger.info("\nパフォーマンス情報:")
-        logger.info(f"- 総処理時間: {duration:.2f}秒")
-        if result.get('performance'):
-            for key, value in result['performance'].items():
-                logger.info(f"- {key}: {value:.2f}秒")
+        # ステップ2: OCR処理
+        logger.info("OCR処理を開始します...")
+        frames_with_images = []
+        for frame in frames_data:
+            image_path = Path(frame['path'])
+            with Image.open(str(image_path)) as img:
+                frames_with_images.append({
+                    **frame,
+                    'image': img.copy()
+                })
+        
+        ocr_results = processor.ocr_processor.process_frames(frames_with_images)
+        
+        ocr_json = temp_dir / 'ocr_results.json'
+        with open(ocr_json, 'w', encoding='utf-8') as f:
+            json.dump(ocr_results, f, ensure_ascii=False, indent=2)
+        logger.info("OCR処理が完了しました")
 
-        # 中間ファイルのサイズ情報
-        logger.info("\n中間ファイルサイズ:")
-        for key, path in PATHS.items():
-            full_path = output_dir / path
-            if full_path.is_file():
-                size = full_path.stat().st_size / (1024 * 1024)  # MB単位
-                logger.info(f"- {key}: {size:.2f}MB")
+        # ステップ3: 音声処理
+        logger.info("音声処理を開始します...")
+        audio_path = processor.audio_extractor.extract_audio(str(video_path))
+        transcription = processor.transcription_processor.transcribe_audio(audio_path)
+        
+        transcription_json = temp_dir / 'transcription.json'
+        with open(transcription_json, 'w', encoding='utf-8') as f:
+            json.dump(transcription, f, ensure_ascii=False, indent=2)
+        logger.info("音声処理が完了しました")
 
-    except VideoProcessorError as e:
-        logger.error(f"処理エラー: {str(e)}")
-        if hasattr(e, 'context'):
-            logger.error(f"エラーコンテキスト: {e.context}")
-        sys.exit(1)
-    except ConfigurationError as e:
-        logger.error(f"設定エラー: {str(e)}")
-        if hasattr(e, 'context'):
-            logger.error(f"エラーコンテキスト: {e.context}")
-        sys.exit(1)
+        # ステップ4: テキスト分析
+        logger.info("テキスト分析を開始します...")
+        analysis_data = {
+            "segments": [
+                {
+                    "start": segment["start"],
+                    "end": segment["end"],
+                    "text": segment["text"]
+                }
+                for segment in transcription
+            ]
+        }
+        
+        analysis_result = processor.text_analyzer.analyze_content_v2(analysis_data, ocr_results)
+        
+        analysis_json = temp_dir / 'analysis.json'
+        with open(analysis_json, 'w', encoding='utf-8') as f:
+            json.dump(analysis_result, f, ensure_ascii=False, indent=2)
+        logger.info("テキスト分析が完了しました")
+
+        # ステップ5: Notion登録用データの生成とSupabase登録
+        logger.info("Notion登録用データの生成を開始します...")
+        notion_data = save_regist_data(analysis_result, output_dir, logger)
+        regist_json = output_dir / 'regist.json'
+
+        # Supabaseへの登録
+        logger.info("Supabaseへの登録を開始します...")
+        duration = get_video_duration(str(video_path))
+        supabase_success = register_to_supabase(video_path, output_dir, logger)
+        
+        if supabase_success:
+            logger.info("Supabaseへの登録が完了しました")
+        else:
+            logger.warning("Supabaseへの登録に失敗しました")
+
+        return {
+            'status': 'success',
+            'output_files': {
+                'frames': str(frames_json),
+                'ocr': str(ocr_json),
+                'transcription': str(transcription_json),
+                'analysis': str(analysis_json),
+                'notion_data': str(regist_json)
+            }
+        }
+
     except Exception as e:
-        logger.error(f"予期せぬエラーが発生しました: {str(e)}", exc_info=True)
+        logger.error(f"エラーが発生しました: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":

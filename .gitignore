@@ -69,5 +69,5 @@ docs/_build/
 docs/_static/
 docs/_templates/
 
-# 設定ファイル（公開不可）
-config/config.yaml
+# Backup files
+*.bak

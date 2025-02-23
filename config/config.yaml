@@ -84,7 +84,7 @@ topic_extraction:
 
 # Notion連携設定
 notion:
-  enabled: true  # Notion連携を有効化
+  enabled: false  # Notion連携を無効化
   database_id: "19225eac-48e3-8036-9930-f9a85397d069"  # 実際のデータベースID
   sync_interval: 60  # 同期間隔(秒)
   retry_count: 3    # 同期失敗時のリトライ回数
