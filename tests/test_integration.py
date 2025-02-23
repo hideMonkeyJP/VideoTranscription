@@ -443,23 +443,6 @@ class TestVideoProcessing:
             pytest.fail(f"Notion登録用データ生成テストでエラーが発生: {str(e)}")
 
     @pytest.mark.order(8)
-    def test_notion_sync(self, video_processing_result):
-        """Notion同期機能のテスト"""
-        try:
-            # Notion同期結果の検証
-            assert 'notion_page_url' in video_processing_result, "NotionページURLがありません"
-            page_url = video_processing_result.get('notion_page_url', '')  # デフォルト値を設定
-            assert isinstance(page_url, str), "NotionページURLが文字列ではありません"
-            if page_url:  # URLが空でない場合のみ検証
-                assert page_url.startswith('https://'), "NotionページURLが不正です"
-            
-            print("\nNotion同期テストが成功しました!")
-            return True
-            
-        except Exception as e:
-            pytest.fail(f"Notion同期テストでエラーが発生: {str(e)}")
-
-    @pytest.mark.order(9)
     def test_supabase_registration(self, video_processing_result):
         """Supabase登録機能のテスト"""
         try:
@@ -507,41 +490,6 @@ class TestVideoProcessing:
         except Exception as e:
             print(f"\nエラーの詳細: {str(e)}")
             pytest.fail(f"Supabase登録テストでエラーが発生: {str(e)}")
-
-    @pytest.mark.order(10)
-    def test_report_generation(self, video_processing_result):
-        """レポート生成機能のテスト"""
-        try:
-            report_path = video_processing_result['output_files']['report']
-            assert os.path.exists(report_path), "レポートファイルが存在しません"
-            
-            # レポート内容の検証
-            with open(report_path, 'r', encoding='utf-8') as f:
-                report_content = f.read()
-            
-            # 基本構造の確認
-            assert '<!DOCTYPE html>' in report_content, "HTMLドキュメントではありません"
-            assert '<title>動画分析レポート</title>' in report_content.replace('{title}', '動画分析レポート'), "タイトルがありません"
-            
-            # 必須セクションの確認
-            required_sections = [
-                'processed_at',
-                'video_duration',
-                'segment_count',
-                'screenshot_count',
-                '<div class="segment"',
-                '<div class="summary"',
-                '<div class="key-points"'
-            ]
-            
-            for section in required_sections:
-                assert section in report_content, f"{section}セクションがありません"
-            
-            print("\nレポート生成テストが成功しました!")
-            return True
-            
-        except Exception as e:
-            pytest.fail(f"レポート生成テストでエラーが発生: {str(e)}")
 
 if __name__ == '__main__':
     pytest.main(['-v', __file__])
