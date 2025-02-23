@@ -58,7 +58,19 @@ class Config:
         Returns:
             Any: 設定値またはデフォルト値
         """
-        return self.config.get(key, default)
+        # ドット記法でネストされた値にアクセス
+        keys = key.split('.')
+        value = self.config
+        
+        for k in keys:
+            if isinstance(value, dict):
+                value = value.get(k)
+                if value is None:
+                    return default
+            else:
+                return default
+                
+        return value if value is not None else default
     
     def _load_default_config(self) -> Dict[str, Any]:
         """デフォルト設定を読み込みます"""
@@ -88,8 +100,9 @@ class Config:
     def _load_config(self, path: str) -> Dict[str, Any]:
         """設定ファイルを読み込みます"""
         try:
+            import yaml
             with open(path, 'r') as f:
-                return json.load(f)
+                return yaml.safe_load(f)
         except Exception as e:
             raise ConfigError(f"設定ファイルの読み込みに失敗しました: {str(e)}")
     

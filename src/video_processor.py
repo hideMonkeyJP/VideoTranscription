@@ -83,17 +83,32 @@ class VideoProcessor:
         # 各コンポーネントの初期化
         self.frame_extractor = FrameExtractor(frame_extractor_config)
         self.audio_extractor = AudioExtractor(self.config_obj.get('audio_extractor', {}))
-        self.transcription_processor = TranscriptionProcessor(self.config_obj.get('transcription', {}))
+        
+        # TranscriptionProcessorの設定を統合
+        transcription_config = {
+            'models': {
+                'whisper_model': self.config_obj.get('models.whisper_model')
+            },
+            'whisper': {
+                'model': {
+                    'name': self.config_obj.get('whisper.model.name')
+                }
+            },
+            **self.config_obj.get('transcription', {})
+        }
+        self.transcription_processor = TranscriptionProcessor(transcription_config)
+        
         self.ocr_processor = OCRProcessor(self.config_obj.get('ocr_processor', {}))
         self.text_analyzer = TextAnalyzer(self.config_obj.get('text_analyzer', {}))
         self.report_generator = ReportGenerator(self.config_obj)
 
         # Notion同期の初期化(設定で有効な場合のみ)
         notion_config = self.config_obj.get('notion', {})
-        if notion_config.get('enabled', True):
+        if notion_config.get('enabled', False):
             self.notion_sync = NotionSynchronizer(self.config_obj)
         else:
             self.notion_sync = None
+            self.logger.info("Notion同期は無効化されています")
 
         # パフォーマンスモニタリング
         self.performance_monitor = PerformanceMonitor()

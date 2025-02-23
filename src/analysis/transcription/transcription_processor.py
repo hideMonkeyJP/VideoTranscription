@@ -29,7 +29,12 @@ class TranscriptionProcessor:
         self.logger = logging.getLogger(__name__)
         
         # 基本設定
-        self.model_name = self.config.get('model_name', 'medium')
+        # whisper.model.nameから設定を読み込む
+        self.model_name = (
+            self.config.get('whisper', {}).get('model', {}).get('name') or  # whisper.model.name
+            'medium'  # デフォルト値をmediumに変更
+        )
+        self.logger.info(f"設定を読み込みました - モデル名: {self.model_name}")
         self.language = self.config.get('language', 'ja')
         self.auto_optimize = self.config.get('auto_optimize', True)
         
