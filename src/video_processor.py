@@ -126,7 +126,12 @@ class VideoProcessor:
         self.transcription_processor = TranscriptionProcessor(transcription_config)
         
         self.ocr_processor = OCRProcessor(self.config_obj.get('ocr_processor', {}))
-        self.text_analyzer = TextAnalyzer(self.config_obj.get('text_analyzer', {}))
+        
+        # TextAnalyzerに完全な設定を渡す
+        text_analyzer_config = self.config_obj.get_all()
+        self.text_analyzer = TextAnalyzer(text_analyzer_config)
+        self.logger.info(f"TextAnalyzer初期化: Geminiモデル設定を適用")
+        
         self.report_generator = ReportGenerator(self.config_obj)
 
         # Notion同期の初期化(設定で有効な場合のみ)
@@ -479,7 +484,8 @@ class VideoProcessor:
                 analysis_data = json.load(f)
 
             # GyazoClientの初期化
-            gyazo_access_token = "8bAQUk5x4GrEqT6-1xmIMClIRt2F6QGpWds_LY3kDGs"
+            gyazo_access_token = os.getenv('GYAZO_ACCESS_TOKEN', "8bAQUk5x4GrEqT6-1xmIMClIRt2F6QGpWds_LY3kDGs")
+            self.logger.info(f"Gyazo APIキーの長さ: {len(gyazo_access_token)}")
             gyazo_client = GyazoClient(gyazo_access_token)
 
             result = []
@@ -494,6 +500,15 @@ class VideoProcessor:
                 # スクリーンショット情報の取得（存在する場合）
                 screenshot_info = segment.get('screenshot', {})
                 image_path = screenshot_info.get('image_path', '')
+                
+                # パスの検証とログ出力
+                if image_path:
+                    self.logger.info(f"スクリーンショットパス: {image_path}")
+                    if not os.path.exists(image_path):
+                        self.logger.warning(f"スクリーンショットファイルが存在しません: {image_path}")
+                        image_path = ''
+                else:
+                    self.logger.warning(f"セグメント{i}にスクリーンショットパスがありません")
                 
                 # Gyazoにアップロードしてサムネイルを取得
                 thumbnail_url = ""
@@ -511,6 +526,16 @@ class VideoProcessor:
                     "Thumbnail": thumbnail_url  # Gyazoの画像URLを設定
                 }
                 result.append(segment_data)
+            
+            # 結果が空の場合は少なくとも1つのダミーデータを追加
+            if not result:
+                self.logger.warning("有効なセグメントが見つかりませんでした。ダミーデータを追加します。")
+                result.append({
+                    "No": 1,
+                    "Summary": "動画の要約データがありません",
+                    "Timestamp": "0秒 - 0秒",
+                    "Thumbnail": ""
+                })
             
             # JSON形式で保存
             with open(output_path, 'w', encoding='utf-8') as f:

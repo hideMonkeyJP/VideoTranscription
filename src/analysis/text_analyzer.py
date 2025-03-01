@@ -48,9 +48,27 @@ class TextAnalyzer:
                 'max_output_tokens': 8192,
             }
             
+            # configからモデル名を取得
+            model_name = 'gemini-1.5-pro'  # デフォルト値
+            if config and 'models' in config and 'gemini' in config['models']:
+                model_name = config['models']['gemini'].get('model_name', model_name)
+                
+                # 生成設定も設定ファイルから取得
+                if 'temperature' in config['models']['gemini']:
+                    generation_config['temperature'] = config['models']['gemini']['temperature']
+                if 'top_p' in config['models']['gemini']:
+                    generation_config['top_p'] = config['models']['gemini']['top_p']
+                if 'top_k' in config['models']['gemini']:
+                    generation_config['top_k'] = config['models']['gemini']['top_k']
+                if 'max_output_tokens' in config['models']['gemini']:
+                    generation_config['max_output_tokens'] = config['models']['gemini']['max_output_tokens']
+            
+            self.logger.info(f"Geminiモデル名: {model_name}")
+            self.logger.info(f"生成設定: {generation_config}")
+            
             if not TextAnalyzer._model:
                 TextAnalyzer._model = genai.GenerativeModel(
-                    model_name='gemini-1.5-pro',
+                    model_name=model_name,
                     generation_config=generation_config
                 )
                 self.logger.info("Geminiモデルを初期化しました")
