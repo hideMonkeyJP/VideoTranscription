@@ -348,7 +348,12 @@ class TextAnalyzer:
 
             return {
                 "segments": summarized_segments,
-                "total_segments": len(summarized_segments)
+                "total_segments": len(summarized_segments),
+                "metadata": {
+                    "video_length": video_length,
+                    "total_segments": total_segments,
+                    "summary_segments": len(summarized_segments)
+                }
             }
 
         except TextAnalysisError:
@@ -356,6 +361,263 @@ class TextAnalyzer:
         except Exception as e:
             self.logger.error(f"分析処理中にエラーが発生しました: {str(e)}")
             raise TextAnalysisError(f"分析処理に失敗しました: {str(e)}")
+
+    def analyze_content_v3(self, analysis_json, ocr_results):
+        """
+        テキスト分析の実行（バージョン3）- 一括要約処理による最適化版
+        
+        Args:
+            analysis_json (dict): 分析用のJSONデータ
+            ocr_results (dict): OCR結果のJSONデータ
+            
+        Returns:
+            dict: 分析結果
+            
+        Raises:
+            TextAnalysisError: テキスト分析中にエラーが発生した場合
+        """
+        try:
+            # 1. 入力データの検証
+            if not isinstance(analysis_json, dict):
+                raise TextAnalysisError("analysis_jsonはdictである必要があります")
+            if not isinstance(ocr_results, dict):
+                raise TextAnalysisError("ocr_resultsはdictである必要があります")
+                
+            # セグメントの検証
+            if 'segments' not in analysis_json:
+                raise TextAnalysisError("analysis_jsonにsegmentsフィールドがありません")
+            if not isinstance(analysis_json['segments'], list):
+                raise TextAnalysisError("segmentsはlistである必要があります")
+                
+            # スクリーンショットの検証
+            if 'screenshots' not in ocr_results:
+                raise TextAnalysisError("ocr_resultsにscreenshotsフィールドがありません")
+            if not isinstance(ocr_results['screenshots'], list):
+                raise TextAnalysisError("screenshotsはlistである必要があります")
+                
+            # 2. データの前処理
+            processed_segments = []
+            for segment in analysis_json['segments']:
+                try:
+                    processed_segment = {
+                        'text': segment['text'],
+                        'start': float(segment['start']),
+                        'end': float(segment['end']),
+                        'confidence': float(segment.get('confidence', 0.0))
+                    }
+                    processed_segments.append(processed_segment)
+                except (KeyError, ValueError) as e:
+                    self.logger.error(f"セグメントの変換エラー: {str(e)}")
+                    
+            processed_screenshots = []
+            for screenshot in ocr_results['screenshots']:
+                try:
+                    text_quality_score = self.calculate_text_quality(screenshot.get('text', ''))
+                    processed_screenshot = {
+                        'timestamp': float(screenshot['timestamp']),
+                        'frame_number': int(screenshot['frame_number']),
+                        'text': screenshot.get('text', ''),
+                        'ocr_confidence': float(screenshot.get('confidence', 0.0)),
+                        'importance_score': float(screenshot.get('importance_score', 0.0)),
+                        'text_quality_score': text_quality_score,
+                        'image_path': screenshot.get('image_path', '')
+                    }
+                    processed_screenshots.append(processed_screenshot)
+                except (KeyError, ValueError) as e:
+                    self.logger.error(f"スクリーンショットの変換エラー: {str(e)}")
+                    
+            if not processed_segments:
+                raise TextAnalysisError("有効なセグメントデータがありません")
+
+            # 3. 動的な要約行数の決定
+            video_length = max(seg['end'] for seg in processed_segments)
+            total_segments = len(processed_segments)
+            
+            # 動画の長さと元のセグメント数に基づいて要約行数を決定
+            base_summary_lines = max(3, round(total_segments * 0.3))  # 最低3行
+            length_factor = max(1, video_length / 60)  # 1分あたりの係数
+            target_summary_lines = min(int(base_summary_lines * length_factor), 15)  # 最大15行
+            
+            # 入力サンプル数に基づいてクラスタ数を調整
+            n_clusters = min(target_summary_lines, total_segments)
+            if n_clusters < 1:
+                n_clusters = 1
+
+            # セグメントのクラスタリングと要約
+            X = np.array([[s['start'], s['end']] for s in processed_segments])
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+            clusters = kmeans.fit_predict(X)
+
+            # クラスタごとにセグメントを整理
+            cluster_data = []
+            for i in range(n_clusters):
+                cluster_segments = [s for j, s in enumerate(processed_segments) if clusters[j] == i]
+                if not cluster_segments:
+                    continue
+
+                # 時間範囲の計算
+                start_time = min(s['start'] for s in cluster_segments)
+                end_time = max(s['end'] for s in cluster_segments)
+                
+                # クラスタ内のテキストを結合
+                combined_text = ' '.join(s['text'] for s in cluster_segments)
+                if not combined_text.strip():
+                    continue
+                
+                cluster_data.append({
+                    'id': i,
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'text': combined_text,
+                    'segments': cluster_segments
+                })
+            
+            # 4. 一括要約処理
+            # トークン数を考慮して分割処理
+            MAX_TOKENS = 30000
+            batches = []
+            current_batch = []
+            current_token_count = 0
+            
+            # 簡易的なトークン数推定（日本語の場合、文字数の約1.5倍がトークン数の目安）
+            for cluster in cluster_data:
+                estimated_tokens = len(cluster['text']) * 1.5
+                
+                if current_token_count + estimated_tokens > MAX_TOKENS and current_batch:
+                    batches.append(current_batch)
+                    current_batch = []
+                    current_token_count = 0
+                
+                current_batch.append(cluster)
+                current_token_count += estimated_tokens
+            
+            if current_batch:
+                batches.append(current_batch)
+            
+            # バッチごとに処理
+            all_summaries = {}
+            for batch_idx, batch in enumerate(batches):
+                # バッチ内の全クラスタを一度に要約
+                prompt = """
+                以下の複数のテキストセクションを個別に要約してください。
+                各セクションは<section id="数字">タグで区切られています。
+                
+                要約のガイドライン:
+                1. 各セクションの主要なポイントを漏らさず含めてください
+                2. 具体的な数値や重要な用語は保持してください
+                3. 文脈や因果関係が明確になるように表現してください
+                4. 冗長な表現は避け、簡潔で分かりやすい日本語を使用してください
+                5. 必ず「です・ます調」で要約を生成してください
+                6. 文末は「～です。」「～ます。」で終わるようにしてください
+                
+                出力形式:
+                <summary id="0">
+                セクション0の要約文
+                </summary>
+                <summary id="1">
+                セクション1の要約文
+                </summary>
+                （以下同様）
+                
+                セクション:
+                """
+                
+                for cluster in batch:
+                    prompt += f"""
+                    <section id="{cluster['id']}">
+                    {cluster['text']}
+                    </section>
+                    """
+                
+                try:
+                    self.logger.info(f"バッチ {batch_idx+1}/{len(batches)} の要約を生成中 ({len(batch)}クラスタ)")
+                    response = self._model.generate_content(prompt)
+                    result_text = response.text.strip()
+                    
+                    # 応答から各セクションの要約を抽出
+                    import re
+                    summary_pattern = r'<summary id="(\d+)">(.*?)</summary>'
+                    summaries = re.findall(summary_pattern, result_text, re.DOTALL)
+                    
+                    for summary_id, summary_text in summaries:
+                        all_summaries[int(summary_id)] = summary_text.strip()
+                    
+                except Exception as e:
+                    raise TextAnalysisError(f"要約の生成中にエラーが発生しました: {str(e)}")
+            
+            # 5. 結果の統合
+            summarized_segments = []
+            for cluster in cluster_data:
+                cluster_id = cluster['id']
+                if cluster_id not in all_summaries:
+                    self.logger.warning(f"クラスタID {cluster_id} の要約が見つかりません")
+                    continue
+                
+                summary = all_summaries[cluster_id]
+                start_time = cluster['start_time']
+                end_time = cluster['end_time']
+                
+                # スクショの選定
+                relevant_shots = [
+                    shot for shot in processed_screenshots
+                    if start_time <= shot['timestamp'] <= end_time
+                ]
+
+                best_shot = None
+                if relevant_shots:
+                    best_shot = max(relevant_shots, key=lambda x: (
+                        x['importance_score'] * 0.4 +
+                        x['ocr_confidence'] * 0.3 +
+                        x['text_quality_score'] * 0.3
+                    ))
+
+                # データ統合（analysis.json形式に合わせる）
+                segment_data = {
+                    "time_range": {
+                        "start": start_time,
+                        "end": end_time
+                    },
+                    "summary": summary,
+                    "importance_score": best_shot['importance_score'] if best_shot else 0.0,
+                    "metadata": {
+                        "segment_count": len(cluster['segments']),
+                        "has_screenshot_text": bool(best_shot),
+                        "summary_points": len(summary.split('。')),
+                        "keyword_count": len(set(summary.split()))
+                    }
+                }
+
+                if best_shot:
+                    segment_data["screenshot"] = {
+                        "timestamp": best_shot['timestamp'],
+                        "frame_number": best_shot['frame_number'],
+                        "text": best_shot['text'],
+                        "ocr_confidence": best_shot['ocr_confidence'],
+                        "image_path": best_shot.get('image_path', '')
+                    }
+
+                summarized_segments.append(segment_data)
+
+            if not summarized_segments:
+                raise TextAnalysisError("有効な要約セグメントを生成できませんでした")
+
+            # 時間順にソート
+            summarized_segments.sort(key=lambda x: x['time_range']['start'])
+
+            return {
+                "segments": summarized_segments,
+                "metadata": {
+                    "video_length": video_length,
+                    "total_segments": total_segments,
+                    "summary_segments": len(summarized_segments),
+                    "api_requests": len(batches)  # APIリクエスト回数を記録
+                }
+            }
+            
+        except Exception as e:
+            if isinstance(e, TextAnalysisError):
+                raise
+            raise TextAnalysisError(f"テキスト分析中にエラーが発生しました: {str(e)}")
 
     def calculate_text_quality(self, text: str) -> float:
         """テキストの品質スコアを計算します（0.0 ~ 1.0）"""

@@ -126,6 +126,10 @@ def main():
     parser.add_argument('video_path', help='処理する動画ファイルのパス')
     parser.add_argument('--output', '-o', default='output_test', help='出力ディレクトリ')
     parser.add_argument('--force', '-f', action='store_true', help='既存のファイルを上書きする')
+    parser.add_argument('--language', '-l', help='言語コード (ja/en)', default='ja')
+    parser.add_argument('--notion', '-n', help='Notionに同期する', action='store_true')
+    parser.add_argument('--supabase', '-s', help='Supabaseに登録する', action='store_true')
+    parser.add_argument('--use-v2', help='テキスト分析にV2アルゴリズムを使用する（デフォルトはV3の一括要約処理）', action='store_true')
     args = parser.parse_args()
 
     try:
