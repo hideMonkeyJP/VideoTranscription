@@ -9,6 +9,7 @@
 - テキスト分析（要約、キーポイント抽出）
 - HTMLレポート生成
 - Notion連携
+- デバイス最適化（CPU/GPU自動選択）
 
 ## 必要条件
 
@@ -16,6 +17,7 @@
 - FFmpeg
 - Tesseract OCR
 - CUDA対応GPUを推奨（文字起こし処理の高速化）
+- Apple Silicon Mac対応（MPS機能）
 
 ## インストール
 
@@ -142,3 +144,12 @@ mypy src/ tests/
 - 作者名
 - メールアドレス
 - プロジェクトURL
+
+## 最近の更新
+
+### 2023-03-01: Whisperモデルのデバイス最適化
+
+- モデルサイズに応じた最適なデバイス（CPU/GPU）選択機能を追加
+- 小さいモデル（tiny, base）はCPUで高速に動作
+- 大きいモデル（small, medium, large）はGPU（MPS/CUDA）で高速に動作
+- 詳細は[ドキュメント](docs/troubleshooting/whisper_device_optimization.md)を参照

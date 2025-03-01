@@ -50,7 +50,7 @@ class TextAnalyzer:
             
             if not TextAnalyzer._model:
                 TextAnalyzer._model = genai.GenerativeModel(
-                    model_name='gemini-pro',
+                    model_name='gemini-1.5-pro',
                     generation_config=generation_config
                 )
                 self.logger.info("Geminiモデルを初期化しました")

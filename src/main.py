@@ -13,6 +13,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
 from src.video_processor import VideoProcessor
+from src.utils.config import Config
 
 def setup_logging(output_dir: Path) -> logging.Logger:
     """ロギングの設定を行います"""
@@ -141,13 +142,17 @@ def main():
         # 出力ディレクトリの準備
         check_output_directory(output_dir, args.force, logger)
 
+        # 設定ファイルから設定を読み込む
+        config_obj = Config('config/config.yaml')
+        config = config_obj.get_all()
+        
+        # 出力ディレクトリの設定を上書き
+        if 'video_processor' not in config:
+            config['video_processor'] = {}
+        config['video_processor']['output_dir'] = str(output_dir)
+        config['video_processor']['temp_dir'] = str(output_dir / 'temp')
+
         # VideoProcessorの初期化
-        config = {
-            'video_processor': {
-                'output_dir': str(output_dir),
-                'temp_dir': str(output_dir / 'temp')
-            }
-        }
         processor = VideoProcessor(config=config)
 
         # 必要なディレクトリの作成

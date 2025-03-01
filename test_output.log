@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.9.6, pytest-8.3.4, pluggy-1.5.0 -- /Users/takayanagihidenori/Cursor/VideoTranscription/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/takayanagihidenori/Cursor/VideoTranscription/tests
+configfile: pytest.ini
+plugins: anyio-4.8.0
+collecting ... collected 1 item
+
+tests/test_integration.py::TestVideoProcessing::test_audio_transcription PASSED [100%]
+
+=============================== warnings summary ===============================
+venv/lib/python3.9/site-packages/urllib3/__init__.py:35
+  /Users/takayanagihidenori/Cursor/VideoTranscription/venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+========================= 1 passed, 1 warning in 1.74s =========================

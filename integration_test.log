@@ -1,0 +1,50 @@
+2025-03-01 11:39:38,802 - test_frame_extraction_ocr - INFO - フレーム間隔 0.2秒 でのテスト開始
+2025-03-01 11:39:44,158 - test_frame_extraction_ocr - INFO - 間隔 0.2秒: 抽出フレーム数 = 269, 平均間隔 = 0.200秒, 処理時間 = 5.36秒
+2025-03-01 11:39:44,158 - test_frame_extraction_ocr - INFO - フレーム間隔 0.5秒 でのテスト開始
+2025-03-01 11:39:46,146 - test_frame_extraction_ocr - INFO - 間隔 0.5秒: 抽出フレーム数 = 112, 平均間隔 = 0.480秒, 処理時間 = 1.99秒
+2025-03-01 11:39:46,146 - test_frame_extraction_ocr - INFO - フレーム間隔 1.0秒 でのテスト開始
+2025-03-01 11:39:47,205 - test_frame_extraction_ocr - INFO - 間隔 1.0秒: 抽出フレーム数 = 54, 平均間隔 = 1.000秒, 処理時間 = 1.06秒
+2025-03-01 11:39:47,216 - test_frame_extraction_ocr - INFO - 重要フレーム比率 2.0% でのテスト開始
+2025-03-01 11:39:49,242 - test_frame_extraction_ocr - INFO - 比率 2.0%: 全フレーム数 = 112, 重要フレーム数 = 2, 実際の比率 = 1.79%
+2025-03-01 11:39:49,242 - test_frame_extraction_ocr - INFO - 重要フレームの平均スコア = 0.106, 通常フレームの平均スコア = 0.009
+2025-03-01 11:39:49,242 - test_frame_extraction_ocr - INFO - 重要フレーム比率 5.0% でのテスト開始
+2025-03-01 11:39:51,236 - test_frame_extraction_ocr - INFO - 比率 5.0%: 全フレーム数 = 112, 重要フレーム数 = 5, 実際の比率 = 4.46%
+2025-03-01 11:39:51,236 - test_frame_extraction_ocr - INFO - 重要フレームの平均スコア = 0.079, 通常フレームの平均スコア = 0.008
+2025-03-01 11:39:51,236 - test_frame_extraction_ocr - INFO - 重要フレーム比率 10.0% でのテスト開始
+2025-03-01 11:39:53,259 - test_frame_extraction_ocr - INFO - 比率 10.0%: 全フレーム数 = 112, 重要フレーム数 = 11, 実際の比率 = 9.82%
+2025-03-01 11:39:53,259 - test_frame_extraction_ocr - INFO - 重要フレームの平均スコア = 0.059, 通常フレームの平均スコア = 0.006
+2025-03-01 11:39:55,364 - test_frame_extraction_ocr - INFO - シーン変更スコア: 平均 = 0.011, 最大 = 0.115, 最小 = 0.000, 処理時間 = 2.08秒
+2025-03-01 11:39:56,465 - test_frame_extraction_ocr - INFO - OCR設定テスト: PSM=3, OEM=3
+2025-03-01 11:39:59,737 - test_frame_extraction_ocr - INFO - PSM=3: テキスト検出数 = 5/5, 平均テキスト長 = 302.2, 処理時間 = 3.27秒
+2025-03-01 11:39:59,738 - test_frame_extraction_ocr - INFO - OCR設定テスト: PSM=6, OEM=3
+2025-03-01 11:40:03,716 - test_frame_extraction_ocr - INFO - PSM=6: テキスト検出数 = 5/5, 平均テキスト長 = 353.8, 処理時間 = 3.98秒
+2025-03-01 11:40:03,716 - test_frame_extraction_ocr - INFO - OCR設定テスト: PSM=11, OEM=3
+2025-03-01 11:40:07,470 - test_frame_extraction_ocr - INFO - PSM=11: テキスト検出数 = 5/5, 平均テキスト長 = 338.0, 処理時間 = 3.75秒
+2025-03-01 11:40:07,470 - test_frame_extraction_ocr - INFO - 最適なOCR設定: PSM=3, OEM=3
+2025-03-01 11:40:16,270 - test_frame_extraction_ocr - INFO - 逐次処理: フレーム数 = 10, 処理時間 = 7.70秒
+2025-03-01 11:40:16,270 - test_frame_extraction_ocr - INFO - 並列処理予測: コア数 = 11, 予測処理時間 = 0.77秒, 予測速度向上 = 10.0倍
+2025-03-01 11:43:39,263 - test_frame_extraction_ocr - INFO - フレーム間隔 0.2秒 でのテスト開始
+2025-03-01 11:43:44,254 - test_frame_extraction_ocr - INFO - 間隔 0.2秒: 抽出フレーム数 = 269, 平均間隔 = 0.200秒, 処理時間 = 4.99秒
+2025-03-01 11:43:44,254 - test_frame_extraction_ocr - INFO - フレーム間隔 0.5秒 でのテスト開始
+2025-03-01 11:43:46,242 - test_frame_extraction_ocr - INFO - 間隔 0.5秒: 抽出フレーム数 = 112, 平均間隔 = 0.480秒, 処理時間 = 1.99秒
+2025-03-01 11:43:46,242 - test_frame_extraction_ocr - INFO - フレーム間隔 1.0秒 でのテスト開始
+2025-03-01 11:43:47,286 - test_frame_extraction_ocr - INFO - 間隔 1.0秒: 抽出フレーム数 = 54, 平均間隔 = 1.000秒, 処理時間 = 1.04秒
+2025-03-01 11:43:47,297 - test_frame_extraction_ocr - INFO - 重要フレーム比率 2.0% でのテスト開始
+2025-03-01 11:43:49,334 - test_frame_extraction_ocr - INFO - 比率 2.0%: 全フレーム数 = 112, 重要フレーム数 = 2, 実際の比率 = 1.79%
+2025-03-01 11:43:49,334 - test_frame_extraction_ocr - INFO - 重要フレームの平均スコア = 0.106, 通常フレームの平均スコア = 0.009
+2025-03-01 11:43:49,334 - test_frame_extraction_ocr - INFO - 重要フレーム比率 5.0% でのテスト開始
+2025-03-01 11:43:51,333 - test_frame_extraction_ocr - INFO - 比率 5.0%: 全フレーム数 = 112, 重要フレーム数 = 5, 実際の比率 = 4.46%
+2025-03-01 11:43:51,333 - test_frame_extraction_ocr - INFO - 重要フレームの平均スコア = 0.079, 通常フレームの平均スコア = 0.008
+2025-03-01 11:43:51,333 - test_frame_extraction_ocr - INFO - 重要フレーム比率 10.0% でのテスト開始
+2025-03-01 11:43:53,344 - test_frame_extraction_ocr - INFO - 比率 10.0%: 全フレーム数 = 112, 重要フレーム数 = 11, 実際の比率 = 9.82%
+2025-03-01 11:43:53,344 - test_frame_extraction_ocr - INFO - 重要フレームの平均スコア = 0.059, 通常フレームの平均スコア = 0.006
+2025-03-01 11:43:55,410 - test_frame_extraction_ocr - INFO - シーン変更スコア: 平均 = 0.011, 最大 = 0.115, 最小 = 0.000, 処理時間 = 2.04秒
+2025-03-01 11:43:56,508 - test_frame_extraction_ocr - INFO - OCR設定テスト: PSM=3, OEM=3
+2025-03-01 11:43:59,731 - test_frame_extraction_ocr - INFO - PSM=3: テキスト検出数 = 5/5, 平均テキスト長 = 302.2, 処理時間 = 3.22秒
+2025-03-01 11:43:59,731 - test_frame_extraction_ocr - INFO - OCR設定テスト: PSM=6, OEM=3
+2025-03-01 11:44:03,990 - test_frame_extraction_ocr - INFO - PSM=6: テキスト検出数 = 5/5, 平均テキスト長 = 353.8, 処理時間 = 4.26秒
+2025-03-01 11:44:03,990 - test_frame_extraction_ocr - INFO - OCR設定テスト: PSM=11, OEM=3
+2025-03-01 11:44:07,707 - test_frame_extraction_ocr - INFO - PSM=11: テキスト検出数 = 5/5, 平均テキスト長 = 338.0, 処理時間 = 3.72秒
+2025-03-01 11:44:07,707 - test_frame_extraction_ocr - INFO - 最適なOCR設定: PSM=3, OEM=3
+2025-03-01 11:44:16,779 - test_frame_extraction_ocr - INFO - 逐次処理: フレーム数 = 10, 処理時間 = 7.96秒
+2025-03-01 11:44:16,779 - test_frame_extraction_ocr - INFO - 並列処理予測: コア数 = 11, 予測処理時間 = 0.80秒, 予測速度向上 = 10.0倍

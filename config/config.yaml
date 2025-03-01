@@ -13,7 +13,7 @@ output:
 models:
   tesseract_path: "/opt/homebrew/bin/tesseract"
   gemini:
-    model_name: "gemini-pro"
+    model_name: "gemini-1.5-pro"
     temperature: 0.3
     top_p: 0.8
     top_k: 40
@@ -25,6 +25,35 @@ models:
       hate_speech: "BLOCK_MEDIUM_AND_ABOVE"
       sexually_explicit: "BLOCK_MEDIUM_AND_ABOVE"
       dangerous_content: "BLOCK_MEDIUM_AND_ABOVE"
+  whisper:
+    model:
+      name: "base"  # tiny, base, small, medium, large
+    device: "cpu"  # cuda, mps, cpu
+    optimize_model: false  # TorchScriptによる最適化を無効にする
+    use_optimized_model: false  # 最適化済みモデルを使用しない
+    cache_dir: "~/.cache/whisper"  # モデルキャッシュディレクトリ
+    fp16: true  # 半精度浮動小数点を使用（高速化）
+    split_long_audio: true  # 長い音声を分割して処理
+    remove_silence: false  # 無音区間を除去（処理時間短縮のため無効化）
+    transcribe_params:
+      beam_size: 5  # ビームサイズ（小さいほど高速）
+      best_of: 3  # 最良の結果を選ぶ候補数（小さいほど高速）
+      patience: 1.0  # 探索の忍耐度（小さいほど高速）
+    # 音声分割処理のパラメータ
+    audio_segmentation:
+      min_segment_length: 30  # 分割処理を行う最小音声長（秒）
+      chunk_length: 30        # 分割するチャンクの長さ（秒）
+      overlap: 2              # チャンク間のオーバーラップ（秒）
+      overlap_threshold: 0.5  # セグメントをマージする重複率の閾値
+
+# フレーム抽出設定
+frame_extractor:
+  target_frames_per_hour: 1000  # 1時間あたりのフレーム数
+  quality: 95                   # 画質設定
+  important_frames_ratio: 0.05  # 重要フレームの比率(5%)
+  min_frames: 100               # 最小フレーム数
+  max_frames: 5000              # 最大フレーム数
+  min_scene_change: 0.3         # シーン変更閾値
 
 # 音声設定
 audio:
@@ -100,18 +129,6 @@ notion:
 logging:
   level: "INFO"
   max_files: 7
-
-# Whisperモデル設定
-whisper:
-  model:
-    name: "medium"  # mediumモデルを使用（models.whisper_modelと統一）
-    device: "auto"  # デバイスは自動選択
-  options:
-    language: "ja"
-    task: "transcribe"
-    beam_size: 5
-    best_of: 5
-    temperature: 0.0
 
 # 音声認識パラメータ
 transcription:

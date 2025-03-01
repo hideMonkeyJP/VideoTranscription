@@ -13,6 +13,7 @@ from PIL import Image
 import numpy as np
 from .utils.performance_monitor import PerformanceMonitor
 from jinja2 import Template
+import torch
 
 from .utils.config import Config
 from .utils.logger import Logger
@@ -72,30 +73,56 @@ class VideoProcessor:
 
         # フレーム抽出の設定を更新
         frame_extractor_config = self.config_obj.get('frame_extractor', {})
+        
+        # 1時間あたりのフレーム数から間隔を計算
+        frames_per_hour = frame_extractor_config.get('target_frames_per_hour', 1000)
+        interval = 3600 / frames_per_hour  # 1時間（3600秒）をフレーム数で割って間隔を算出
+        
         frame_extractor_config.update({
-            'interval': 0.52,  # 0.52秒間隔でフレームを抽出
-            'quality': 95,
-            'frames_per_hour': 6923,  # 1時間あたり約6923フレーム(0.52秒間隔)
-            'important_frames_ratio': 0.05,  # 重要フレーム5%
-            'min_scene_change': 0.3  # シーン変更閾値
+            'interval': interval,  # 設定から計算した間隔
+            'quality': frame_extractor_config.get('quality', 95),
+            'important_frames_ratio': frame_extractor_config.get('important_frames_ratio', 0.05),
+            'min_scene_change': frame_extractor_config.get('min_scene_change', 0.3)
         })
+        
+        self.logger.info(f"フレーム抽出設定: 1時間あたり{frames_per_hour}フレーム（間隔: {interval:.2f}秒）")
 
         # 各コンポーネントの初期化
         self.frame_extractor = FrameExtractor(frame_extractor_config)
         self.audio_extractor = AudioExtractor(self.config_obj.get('audio_extractor', {}))
         
         # TranscriptionProcessorの設定を統合
-        transcription_config = {
-            'models': {
-                'whisper_model': self.config_obj.get('models.whisper_model')
-            },
-            'whisper': {
-                'model': {
-                    'name': self.config_obj.get('whisper.model.name')
-                }
-            },
-            **self.config_obj.get('transcription', {})
-        }
+        transcription_config = self.config_obj.get_all()
+        
+        # テスト用の設定をオーバーライドしないように、元の設定を保持
+        whisper_config = transcription_config.get('models', {}).get('whisper', {})
+        if not whisper_config.get('model', {}).get('name'):
+            # 設定が不足している場合のみデフォルト値を設定
+            if 'models' not in transcription_config:
+                transcription_config['models'] = {}
+            if 'whisper' not in transcription_config['models']:
+                transcription_config['models']['whisper'] = {}
+            if 'model' not in transcription_config['models']['whisper']:
+                transcription_config['models']['whisper']['model'] = {}
+            if 'name' not in transcription_config['models']['whisper']['model']:
+                transcription_config['models']['whisper']['model']['name'] = 'base'
+        
+        # デバイス設定が不足している場合のみデフォルト値を設定
+        if not whisper_config.get('device'):
+            # 小さいモデル（tiny, base）はCPUの方が高速
+            if transcription_config['models']['whisper']['model']['name'] in ['tiny', 'base']:
+                transcription_config['models']['whisper']['device'] = 'cpu'
+            # 大きいモデル（small, medium, large）はGPUの方が高速
+            else:
+                # デフォルトのデバイス選択ロジックを使用
+                if torch.cuda.is_available():
+                    transcription_config['models']['whisper']['device'] = 'cuda'
+                elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+                    transcription_config['models']['whisper']['device'] = 'mps'
+                else:
+                    transcription_config['models']['whisper']['device'] = 'cpu'
+                
+        self.logger.info(f"Whisperモデル設定: {transcription_config['models']['whisper']['model']['name']}, デバイス: {transcription_config['models']['whisper'].get('device', '自動検出')}")
         self.transcription_processor = TranscriptionProcessor(transcription_config)
         
         self.ocr_processor = OCRProcessor(self.config_obj.get('ocr_processor', {}))
